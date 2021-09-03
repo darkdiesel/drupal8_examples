@@ -1,0 +1,186 @@
+<?php
+
+use Drupal\Core\Database\Database;
+
+/**
+ * Implements hook_schema().
+ */
+function ip_webform_api_schema() {
+  $schema['ip_webform_api_tasks'] = [
+    'description' => t('Stores api task information.'),
+    'fields'      => [
+      'task_id'       => [
+        'type'        => 'serial',
+        'unsigned'    => TRUE,
+        'not null'    => TRUE,
+        'description' => 'Primary identifier for api task.',
+      ],
+      'task'          => [
+        'description' => 'Task text',
+        'type'        => 'text',
+        'not null'    => TRUE,
+        'size'        => 'medium',
+      ],
+      'webform_id'    => [
+        'type'        => 'varchar',
+        'length'      => 256,
+        'not null'    => TRUE,
+        'default'     => '',
+        'description' => t('The webform id.'),
+      ],
+      'submission_id' => [
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+        'description' => t('The submission id.'),
+      ],
+      'status'        => [
+        'type'        => 'varchar',
+        'length'      => 256,
+        'not null'    => TRUE,
+        'default'     => '',
+        'description' => 'Task status',
+      ],
+      'created_at'    => [
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+        'description' => 'A Unix timestamp indicating when this task was created.',
+      ],
+      'updated_at'    => [
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+        'description' => 'A Unix timestamp indicating when this task was updated.',
+      ],
+    ],
+    'primary key' => [
+      'task_id',
+    ],
+  ];
+
+  $schema['ip_webform_api_tasks_logs'] = [
+    'description'  => t('Stores task information logs according to each task.'),
+    'fields'       => [
+      'log_id'     => [
+        'type'        => 'serial',
+        'unsigned'    => TRUE,
+        'not null'    => TRUE,
+        'description' => 'Primary identifier for log.',
+      ],
+      'task_id'    => [
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+        'description' => t('The {user}.uid of the user crating the link.'),
+      ],
+      'message'    => [
+        'description' => 'Log text',
+        'type'        => 'text',
+        'not null'    => TRUE,
+        'size'        => 'medium',
+      ],
+      'created_at' => [
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+        'description' => 'A Unix timestamp indicating when this log was created.',
+      ],
+    ],
+    'foreign keys' => [
+      'task_id' => [
+        'table'   => 'ip_webform_api_tasks',
+        'columns' => [
+          'task_id' => 'task_id',
+        ],
+      ],
+    ],
+    'primary key'  => [
+      'log_id',
+    ],
+  ];
+
+  $schema['ip_webform_submission_organisation'] = [
+    'description'  => t('Stores links submission to organisation.'),
+    'fields'       => [
+      'connection_id'     => [
+        'type'        => 'serial',
+        'unsigned'    => TRUE,
+        'not null'    => TRUE,
+        'description' => 'Primary identifier for log.',
+      ],
+      'webform_id'    => [
+        'type'        => 'varchar',
+        'length'      => 256,
+        'not null'    => TRUE,
+        'default'     => '',
+        'description' => t('The webform id.'),
+      ],
+      'submission_id' => [
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+        'description' => t('The submission id.'),
+      ],
+      'organisation_id' => [
+        'type'        => 'int',
+        'not null'    => FALSE,
+        'default'     => NULL,
+        'description' => t('The organisation id.'),
+      ],
+    ],
+
+    'primary key'  => [
+      'connection_id',
+    ],
+  ];
+
+  return $schema;
+}
+
+/**
+ * Add table for linked submission to organisation
+ */
+function ip_webform_api_update_8002() {
+  if (!Database::getConnection()->schema()->tableExists('ip_webform_submission_organisation')) {
+    $table = drupal_get_module_schema('ip_webform_api', 'ip_webform_submission_organisation');
+
+    Database::getConnection()->schema()->createTable('ip_webform_submission_organisation', $table);
+  }
+}
+
+/**
+ * Add webform and submission id fields to webform api tasks
+ */
+function ip_webform_api_update_8003() {
+  $field_spc = [
+    'type'        => 'varchar',
+    'length'      => 256,
+    'not null'    => TRUE,
+    'default'     => '',
+    'description' => t('The webform id.'),
+  ];
+
+  if (!Database::getConnection()
+               ->schema()
+               ->fieldExists('ip_webform_api_tasks', 'webform_id')) {
+    Database::getConnection()
+            ->schema()
+            ->addField('ip_webform_api_tasks', 'webform_id', $field_spc);
+  }
+
+  $field_spc = [
+    'type'        => 'int',
+    'not null'    => TRUE,
+    'default'     => 0,
+    'description' => t('The submission id.'),
+  ];
+
+  if (!Database::getConnection()
+               ->schema()
+               ->fieldExists('ip_webform_api_tasks', 'submission_id')) {
+    Database::getConnection()
+            ->schema()
+            ->addField('ip_webform_api_tasks', 'submission_id', $field_spc);
+  }
+}

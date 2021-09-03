@@ -1,0 +1,4 @@
+ip_webform.main:
+  title: 'Create webform'
+  route_name: ip_webform.main
+  base_route: ip_webform.main

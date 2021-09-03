@@ -1,0 +1,82 @@
+<?php
+
+use Drupal\ip_react_app\Controller\IpReactAppUpdateCheckerController;
+use Drupal\ip_settings\Controller\IpSettingsController;
+
+/**
+ * Implements hook_cron()
+ */
+function ip_react_app_cron(){
+  $validation = TRUE;
+
+  $config = \Drupal::config('ip.react_app.build');
+  $config = $config->get();
+
+  if (is_array($config)) {
+    if (!isset($config['url']) || !$config['url']) {
+      \Drupal::logger('ip_react_app')->error(t('Configuration missed. Please add ip.react_app.build.url to settings file.'));
+      $validation = FALSE;
+    }
+
+    if (!isset($config['token']) || !$config['token']) {
+      \Drupal::logger('ip_react_app')->error(t('Configuration missed. Please add ip.react_app.build.token to settings file.'));
+      $validation = FALSE;
+    }
+
+    $react_settings = IpSettingsController::getReactSettings();
+
+    $domain = $react_settings->get('react_domain');
+
+    if (!$domain) {
+      \Drupal::logger('ip_react_app')->error(t('Configuration missed. Please add react domain to admin-system.'));
+    }
+
+//    if (!isset($_SERVER['HTTP_HOST']) || !$_SERVER['HTTP_HOST']) {
+//      \Drupal::logger('ip_react_app')->error(t('Host nod founded!.'));
+//      $validation = FALSE;
+//    }
+
+    if (!isset($config['local_dir']) || !$config['local_dir']) {
+      \Drupal::logger('ip_react_app')->error(t('Configuration missed. Please add ip.react_app.build.local_dir to settings file.'));
+      $validation = FALSE;
+    }
+  } else {
+    $validation = FALSE;
+  }
+
+  if (!$validation) {
+    return;
+  }
+
+  $response = IpReactAppUpdateCheckerController::checkBuildUpdates($config['url'], $config['token'], $domain);
+
+  if (isset($response['site'])) {
+    // installed build time
+    $last_time = IpReactAppUpdateCheckerController::getLastTimeBuilded();
+
+    // response build time
+    $response_build_time =  (isset($response['site']['last_update']) && $response['site']['last_update']>0) ? \Drupal::service('date.formatter')->format($response['site']['last_update'], 'custom', 'Y-m-d H:i:s') : t('Not Found!');
+
+    if (($response['site']['last_update'] > 0) &&  ($response['site']['last_update'] != $last_time)) {
+      $errors = FALSE;
+
+      if (isset($response['build_file']) && $response['build_file']) {
+        $uri = $config['url'] . $response['build_file'];
+
+        if (IpReactAppUpdateCheckerController::updateBuild($uri, $config) === FALSE) {
+          $errors = TRUE;
+        } else {
+          IpReactAppUpdateCheckerController::saveLastTimeBuilded($response['site']['last_update']);
+          \Drupal::logger('ip_react_app')->info(t('React build updated for domain @domain. Build time: @time', ['@domain' => $domain,'@time' => $response_build_time]));
+        }
+      } else {
+        $errors = TRUE;
+      }
+      if ($errors) {
+        \Drupal::logger('ip_react_app')->error(t('Some error occurred while saving react app build file.'));
+      }
+    } else {
+      \Drupal::logger('ip_react_app')->info(t('No changes for react build for domain @domain. Build time: @time', ['@domain' => $domain, '@time' => $response_build_time]));
+    }
+  }
+}

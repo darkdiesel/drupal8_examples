@@ -1,0 +1,8 @@
+name: Ip Reports
+type: module
+description: Provide api calls and other info for reports
+package: Ip
+core: 8.x
+
+dependencies:
+  - ip_webform_api

@@ -1,0 +1,89 @@
+ip_webform_api:
+  path: '/admin/reports/ip_webform_api'
+  defaults:
+    _controller: '\Drupal\ip_webform_api\Controller\TaskLogsController::webformApiReportTasks'
+    _title: 'Cron Tasks - Webform Submissions'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_webform_api.tasks:
+  path: '/admin/reports/ip_webform_api/tasks'
+  defaults:
+    _controller: '\Drupal\ip_webform_api\Controller\TaskLogsController::webformApiReportTasks'
+    _title: 'Cron Tasks - Webform Submissions | All Tasks'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_webform_api.tasks.pending:
+  path: '/admin/reports/ip_webform_api/tasks/pending'
+  defaults:
+    _controller: '\Drupal\ip_webform_api\Controller\TaskLogsController::pendingTasks'
+    _title: 'Cron Tasks - Webform Submissions | Pending Tasks'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_webform_api.tasks.processing:
+  path: '/admin/reports/ip_webform_api/tasks/processing'
+  defaults:
+    _controller: '\Drupal\ip_webform_api\Controller\TaskLogsController::processingTasks'
+    _title: 'Cron Tasks - Webform Submissions | Tasks in Progress'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_webform_api.tasks.finished:
+  path: '/admin/reports/ip_webform_api/tasks/finished'
+  defaults:
+    _controller: '\Drupal\ip_webform_api\Controller\TaskLogsController::finishedTasks'
+    _title: 'Cron Tasks - Webform Submissions | Finished Tasks'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_webform_api.tasks.failed:
+  path: '/admin/reports/ip_webform_api/tasks/failed'
+  defaults:
+    _controller: '\Drupal\ip_webform_api\Controller\TaskLogsController::failedTasks'
+    _title: 'Cron Tasks - Webform Submissions | Failed Tasks'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_webform_api.logs:
+  path: '/admin/reports/ip_webform_api/logs'
+  defaults:
+    _controller: '\Drupal\ip_webform_api\Controller\TaskLogsController::webformApiReportLogs'
+    _title: 'Cron Tasks - Webform Submissions | All Logs'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_webform_api.detail.info:
+  path: '/admin/reports/ip_webform_api/{task_id}/info'
+  defaults:
+    _controller: '\Drupal\ip_webform_api\Controller\TaskLogsController::taskApiDetailInfo'
+    _title: 'Cron Tasks - Webform Submissions | Task detail'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_webform_api.detail.logs:
+  path: '/admin/reports/ip_webform_api/{task_id}/logs'
+  defaults:
+    _controller: '\Drupal\ip_webform_api\Controller\TaskLogsController::taskApiDetailLogs'
+    _title: 'Cron Tasks - Webform Submissions | Task detail logs'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'

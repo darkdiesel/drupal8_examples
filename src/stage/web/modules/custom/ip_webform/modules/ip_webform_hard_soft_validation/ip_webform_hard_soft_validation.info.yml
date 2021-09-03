@@ -1,0 +1,8 @@
+name: Ip Webform Hard & Soft Validation
+type: module
+description: Add validation rules for webform validations
+package: Ip
+core: 8.x
+
+dependencies:
+  - webform

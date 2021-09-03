@@ -1,0 +1,40 @@
+<?php
+
+use Drupal\Core\Form\FormStateInterface;
+
+
+/**
+ * Implements hook_entity_type_alter().
+ */
+function ip_webform_sorting_entity_type_alter(array &$entity_types) {
+  /** @var $entity_types \Drupal\Core\Entity\EntityTypeInterface[] */
+  $entity_types['webform']->setListBuilderClass('Drupal\ip_webform_sorting\IpWebformEntityListBuilder');
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ *
+ * @param $form
+ * @param \Drupal\Core\Form\FormStateInterface $form_state
+ */
+function ip_webform_sorting_form_webform_settings_form_alter(&$form, FormStateInterface $form_state) {
+  $webform = $form_state->getFormObject()->getEntity();
+
+  $form['general_settings']['weight'] = [
+    '#type' => 'number',
+    '#size' => 5,
+    '#title'         => t('Weight'),
+    '#default_value' => $webform->getWeight(),
+    '#id'            => 'weight',
+    '#required'      => TRUE
+    // '#return_value' => IpIndicatorModel::get($webform->id(), $element)
+  ];
+
+  $form['actions']['submit']['#submit'][] = '_ip_webform_sorting_weight_submit';
+}
+
+function _ip_webform_sorting_weight_submit($form, \Drupal\Core\Form\FormStateInterface $form_state){
+  if ($webform = $form_state->getFormObject()->getEntity()) {
+    $webform->set('weight',$form_state->getValue('weight'));
+  }
+}

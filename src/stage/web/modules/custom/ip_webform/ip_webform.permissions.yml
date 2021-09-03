@@ -1,0 +1,12 @@
+add ip webform field:
+  title: 'Add new field'
+  description: 'Add new fields to webform on dashboard edit page'
+delete ip webform field:
+  title: 'Delete field'
+  description: 'Delete fields from webform on dashboard edit page'
+view ip webform logs:
+  title: 'View logs'
+  description: 'View logs from webform on dashboard logs page'
+get ip webform results csv:
+  title: 'Get webform results csv'
+  description: 'Get results csv for webfrom on dashboard page'

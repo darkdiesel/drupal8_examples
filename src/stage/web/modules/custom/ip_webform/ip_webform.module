@@ -1,0 +1,729 @@
+<?php
+
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Url;
+use Drupal\webform\Entity\Webform;
+use Drupal\webform\Utility\WebformFormHelper;
+use Drupal\webform\Utility\WebformElementHelper;
+use Drupal\webform\WebformSubmissionForm;
+
+/**
+ * Implements hook_ENTITY_TYPE_presave().
+ */
+function ip_webform_webform_presave(\Drupal\webform\WebformInterface $webform) {
+  $created_elements = ip_webform_get_created_webform_elements($webform);
+  $deleted_elements = ip_webform_get_deleted_webform_elements($webform);
+  $updated_elements = ip_webform_get_updated_webform_elements($webform);
+
+  foreach ($created_elements as $element_key => $element) {
+    $log = t('Field "@name" (machine name: @key) with "@type" type added from form', [
+      '@name' => $element['#title'],
+      '@key' => $element_key,
+      '@type' => $element['#type'],
+    ]);
+    \Drupal\ip_webform\Model\IpWebFormLogsModel::add($log, $webform->id());
+  }
+
+  foreach ($deleted_elements as $element_key => $element) {
+    $log = t('Field "@name" (machine name: @key) with "@type" type deleted from form', [
+      '@name' => $element['#title'],
+      '@key' => $element_key,
+      '@type' => $element['#type'],
+    ]);
+    \Drupal\ip_webform\Model\IpWebFormLogsModel::add($log, $webform->id());
+  }
+
+  foreach ($updated_elements as $element_key => $element) {
+    $log = t('Field "@name" (machine name: @key)  with "@type" type updated', [
+      '@name' => $element['#title'],
+      '@key' => $element_key,
+      '@type' => $element['#type'],
+    ]);
+    \Drupal\ip_webform\Model\IpWebFormLogsModel::add($log, $webform->id());
+  }
+}
+
+/**
+ * Retrieves a webform's newly created elements.
+ */
+function ip_webform_get_created_webform_elements(Drupal\webform\WebformInterface $webform) {
+
+  $elements_original = $webform->getElementsOriginalDecoded() ?: [];
+  $elements = $webform->getElementsDecoded() ?: [];
+  $elements_array = [];
+
+  // If webform elements have been altered.
+  if ($elements_original != $elements) {
+
+    // Get associative arrays returned by $webform->getElementsOriginalDecoded()
+    // as nested arrays.
+    $elements_original = Drupal\webform\Utility\WebformElementHelper::getFlattened($elements_original);
+    $elements = Drupal\webform\Utility\WebformElementHelper::getFlattened($elements);
+
+    // Get newly created elements.
+    if ($created_elements = array_diff_key($elements, $elements_original)) {
+      foreach ($created_elements as $element_key => $element) {
+        $elements_array[$element_key] = $element;
+      }
+    }
+  }
+
+  return $elements_array;
+
+}
+
+/**
+ * Retrieves a webform's updated elements.
+ */
+function ip_webform_get_updated_webform_elements(Drupal\webform\WebformInterface $webform) {
+
+  $elements_original = $webform->getElementsOriginalDecoded() ?: [];
+  $elements = $webform->getElementsDecoded() ?: [];
+  $elements_array = [];
+
+  // If webform elements have been altered.
+  if ($elements_original != $elements) {
+
+    // Get associative arrays returned by $webform->getElementsOriginalDecoded()
+    // as nested arrays.
+    $elements_original = Drupal\webform\Utility\WebformElementHelper::getFlattened($elements_original);
+    $elements = Drupal\webform\Utility\WebformElementHelper::getFlattened($elements);
+
+    // Get updated elements.
+    foreach ($elements as $element_key => $element) {
+      if (isset($elements_original[$element_key]) && $elements_original[$element_key] != $element) {
+        $elements_array[$element_key] = $element;
+      }
+    }
+  }
+
+  return $elements_array;
+
+}
+
+/**
+ * Retrieves a webform's deleted elements.
+ */
+function ip_webform_get_deleted_webform_elements(Drupal\webform\WebformInterface $webform) {
+
+  $elements_original = $webform->getElementsOriginalDecoded() ?: [];
+  $elements = $webform->getElementsDecoded() ?: [];
+  $elements_array = [];
+
+  // If webform elements have been altered.
+  if ($elements_original != $elements) {
+
+    // Get associative arrays returned by $webform->getElementsOriginalDecoded()
+    // as nested arrays.
+    $elements_original = Drupal\webform\Utility\WebformElementHelper::getFlattened($elements_original);
+    $elements = Drupal\webform\Utility\WebformElementHelper::getFlattened($elements);
+
+    // Get deleted elements.
+    if ($deleted_elements = array_diff_key($elements_original, $elements)) {
+      foreach ($deleted_elements as $element_key => $element) {
+        $elements_array[$element_key] = $element;
+      }
+    }
+  }
+
+  return $elements_array;
+
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function ip_webform_webform_submission_form_alter(array &$form, FormStateInterface $form_state, $form_id) {
+  if (!isset($form['elements']) || !count($form['elements'])) {
+    return;
+  }
+
+  // Flattening the elements makes it much easier to access nested elements.
+  $elements = WebformFormHelper::flattenElements($form['elements']);
+
+  $field_types = [
+    'checkbox',
+    'checkboxes',
+    'color',
+    'date',
+    'datelist',
+    'email',
+    'entity_autocomplete',
+    'file',
+    'number',
+    'password',
+    'password_confirm',
+    'radio',
+    'radios',
+    'range',
+    'responsive_image ',
+    'search',
+    'select',
+    'tel',
+    'text_format',
+    'textarea',
+    'textfield',
+    'url',
+    'value',
+  ];
+
+  $container_types = [
+
+  ];
+
+  // if access false check that user has view access
+  foreach ($elements as $element) {
+    if (isset($element['#access']) && !$element['#access']) {
+      if (_ip_webform_checkAccessRules('view', $element)) {
+        $is_type_field = WebformElementHelper::isType($element, $field_types);
+
+        if ($is_type_field) {
+          _ip_webform_make_readonly_webform_element($form['elements'], $element['#webform_parents']);
+        }
+      };
+    }
+  }
+}
+
+
+function _ip_webform_checkAccessRules($operation, array $element, AccountInterface $account = NULL) {
+  // Get the current user.
+  $account = Drupal::currentUser();
+
+  // If #private, check that the current user can 'view any submission'.
+  if (!empty($element['#private'])) {
+    // If #webform is missing, block access to the element.
+    if (empty($element['#webform'])) {
+      return FALSE;
+    }
+    // Check 'submission_view_any' access to the element's associated webform.
+    $webform = Webform::load($element['#webform']);
+    if (!$webform->access('submission_view_any', $account)) {
+      return FALSE;
+    }
+  }
+
+  return _ip_webform_checkAccessRule($element, $operation, $account);
+}
+
+/**
+ * Checks an access rule against a user account's roles and id.
+ *
+ * @param array $element
+ *   The element.
+ * @param string $operation
+ *   The operation.
+ * @param \Drupal\Core\Session\AccountInterface $account
+ *   The user session for which to check access.
+ *
+ * @return bool
+ *   The access result. Returns a TRUE if access is allowed.
+ *
+ * @see \Drupal\webform\Entity\Webform::checkAccessRule
+ */
+function _ip_webform_checkAccessRule(array $element, $operation, AccountInterface $account) {
+  // If no access rules are set return TRUE.
+  // @see \Drupal\webform\Plugin\WebformElementBase::getDefaultBaseProperties
+  if (!isset($element['#access_' . $operation . '_roles'])
+      && !isset($element['#access_' . $operation . '_users'])
+      && !isset($element['#access_' . $operation . '_permissions'])) {
+    return TRUE;
+  }
+
+  // If access roles are not set then use the anonymous and authenticated
+  // roles from the element's default properties.
+  // @see \Drupal\webform\Plugin\WebformElementBase::getDefaultBaseProperties
+  if (!isset($element['#access_' . $operation . '_roles'])) {
+    $element['#access_' . $operation . '_roles'] = $this->getDefaultProperty('access_' . $operation . '_roles') ?: [];
+  }
+  if (array_intersect($element['#access_' . $operation . '_roles'], $account->getRoles())) {
+    return TRUE;
+  }
+
+  if (isset($element['#access_' . $operation . '_users']) && in_array($account->id(), $element['#access_' . $operation . '_users'])) {
+    return TRUE;
+  }
+
+  if (isset($element['#access_' . $operation . '_permissions'])) {
+    foreach ($element['#access_' . $operation . '_permissions'] as $permission) {
+      if ($account->hasPermission($permission)) {
+        return TRUE;
+      }
+    }
+  }
+
+  return FALSE;
+}
+
+function _ip_webform_make_readonly_webform_element(&$form, $keys){
+  $key = array_shift($keys);
+
+  if (count($keys)){
+    _ip_webform_make_readonly_webform_element($form[$key], $keys);
+  } else {
+    $form[$key]['#access'] = TRUE;
+    $form[$key]['#type'] = 'item';
+    $form[$key]['#attributes']['disabled'][] = 'disabled';
+  }
+}
+
+
+/**
+ *
+ * implements hook_form_FORM_ID_alter().
+ *
+ * @param $form
+ * @param \Drupal\Core\Form\FormStateInterface $form_state
+ * @param $form_id
+ */
+function ip_webform_form_webform_settings_form_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id){
+  /** @var \Drupal\webform\WebformInterface $entity */
+  $entity = $form_state->getFormObject()->getEntity();
+  $currentUser = Drupal::currentUser();
+
+  $form['form_questionnaire_settings'] = [
+    '#type' => 'details',
+    '#title' => t('Questionnaire settings'),
+    '#open' => FALSE,
+    //    '#open' => array_filter($properties) ? TRUE : FALSE,
+    //'#access' => !$this->moduleHandler->moduleExists('webform_ui') || $this->currentUser()->hasPermission('edit webform source'),
+    '#access' => $currentUser->hasPermission('edit webform source'),
+  ];
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'cycle_name');
+  $form['form_questionnaire_settings']['cycle_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Name of cycle"),
+    '#description' => t('Name of new Q'),
+    '#default_value' => $val,
+    '#required' => FALSE,
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'cycle_short_name');
+  $form['form_questionnaire_settings']['cycle_short_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t("Short name of cycle"),
+    '#description' => t('Short description of cycle name'),
+    '#default_value' => $val,
+    '#required' => FALSE,
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'explanation_text');
+  $form['form_questionnaire_settings']['explanation_text'] = array(
+    '#type' => 'text_format',
+    '#title' => t("Explanation text"),
+//    '#description' => t(''),
+    '#format' => 'full_html',
+    '#default_value' => isset($val['value']) ? $val['value'] : '',
+    '#required' => FALSE,
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'data_entry');
+  $form['form_questionnaire_settings']['data_entry'] = array(
+    '#type' => 'radios',
+    '#title' => t('Data entry'),
+    '#description' => t('Selection: data entry is active'),
+    '#options' => [
+      'active' => t('Active'),
+      'not_active' => t('Not Active'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : 'no_changes',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'security_benchmarking');
+  $form['form_questionnaire_settings']['security_benchmarking'] = array(
+    '#type' => 'radios',
+    '#title' => t('Security Benchmarking'),
+    '#description' => t('Selection to secure benchmark'),
+    '#options' => [
+      'active' => t('Active'),
+      'not_active' => t('Not Active'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : 'no_changes',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'public_benchmarking');
+  $form['form_questionnaire_settings']['public_benchmarking'] = array(
+    '#type' => 'radios',
+    '#title' => t('Public Benchmarking'),
+    '#description' => t('Selection to open benchmark'),
+    '#options' => [
+      'active' => t('Active'),
+      'not_active' => t('Not Active'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : 'no_changes',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'reports');
+  $form['form_questionnaire_settings']['reports'] = array(
+    '#type' => 'radios',
+    '#title' => t('Reports'),
+    '#description' => t('Selection; reports active or not-active'),
+    '#options' => [
+      'active' => t('Active'),
+      'not_active' => t('Not Active'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'news');
+  $form['form_questionnaire_settings']['news'] = array(
+    '#type' => 'radios',
+    '#title' => t('News'),
+    '#description' => t('Selection; news active or not-active'),
+    '#options' => [
+      'active' => t('Active'),
+      'not_active' => t('Not Active'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'recent_question_list');
+  $form['form_questionnaire_settings']['recent_question_list'] = array(
+    '#type' => 'radios',
+    '#title' => t('Recent question list'),
+    '#description' => t('Selection; is Q recent?'),
+    '#options' => [
+      'yes' => t('Yes'),
+      'no' => t('No'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'overview_text');
+  $form['form_questionnaire_settings']['overview_text'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Text for Overview'),
+    '#description' => t('For adding text to overview page'),
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $form['form_questionnaire_settings']['download_q_analyses'] = [
+    '#type' => 'link',
+    '#title' => t('Download Q-analyses'),
+    '#title_display' => 'invisible',
+    '#description' => t('Download Q-analysis to excel'),
+    //'#url' => Url::fromRoute('entity.node.canonical', ['node' => $report->report_node_id], ['absolute' => TRUE]),
+    '#url' => Url::fromUri('https://cviews-api.dev.cogniteq.com/api/'),
+    '#attributes' => [
+      'class' => ['button', 'button--primary']
+    ]
+  ];
+
+  $form['form_questionnaire_settings']['download_q_metadata'] = [
+    '#type' => 'link',
+    '#title' => t('Download Q-metadata'),
+    '#title_display' => 'invisible',
+    '#description' => t('Download Q-metadata to excel'),
+    //'#url' => Url::fromRoute('entity.node.canonical', ['node' => $report->report_node_id], ['absolute' => TRUE]),
+    '#url' => Url::fromUri('https://cviews-api.dev.cogniteq.com/api/'),
+    '#attributes' => [
+      'class' => ['button', 'button--primary']
+    ]
+  ];
+
+  $form['form_questionnaire_settings']['download_auditlog'] = [
+    '#type' => 'link',
+    '#title' => t('Download Auditlog '),
+    '#title_display' => 'invisible',
+    '#description' => t('Download Auditlog  to excel'),
+    //'#url' => Url::fromRoute('entity.node.canonical', ['node' => $report->report_node_id], ['absolute' => TRUE]),
+    '#url' => Url::fromUri('https://cviews-api.dev.cogniteq.com/api/'),
+    '#attributes' => [
+      'class' => ['button', 'button--primary']
+    ]
+  ];
+
+  $form['form_questionnaire_settings']['input_data_options'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Input Data'),
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'input_data_show_estimate_reliable');
+  $form['form_questionnaire_settings']['input_data_options']['input_data_show_estimate_reliable'] = array(
+    '#type' => 'radios',
+    '#title' => t('Show "Estimate/Not 100% reliable"'),
+    //    '#description' => t(''),
+    '#options' => [
+      'yes' => t('Yes'),
+      'no' => t('No'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'input_data_show_remarks');
+  $form['form_questionnaire_settings']['input_data_options']['input_data_show_remarks'] = array(
+    '#type' => 'radios',
+    '#title' => t('Show Remarks'),
+    //    '#description' => t(''),
+    '#options' => [
+      'yes' => t('Yes'),
+      'no' => t('No'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'input_data_show_description_popup');
+  $form['form_questionnaire_settings']['input_data_options']['input_data_show_description_popup'] = array(
+    '#type' => 'radios',
+    '#title' => t('Show Description Pop-Up'),
+    //    '#description' => t(''),
+    '#options' => [
+      'yes' => t('Yes'),
+      'no' => t('No'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $form['form_benchmark_settings'] = [
+    '#type' => 'details',
+    '#title' => t('Benchmarks settings'),
+    '#open' => FALSE,
+    '#access' => $currentUser->hasPermission('edit webform source'),
+  ];
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'benchmarks_show_individual_res');
+  $form['form_benchmark_settings']['benchmarks_show_individual_res'] = array(
+    '#type' => 'radios',
+    '#title' => t('Show individual results'),
+//    '#description' => t(''),
+    '#options' => [
+      'yes' => t('Yes'),
+      'no' => t('No'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'benchmarks_show_drilldown_in_own_hierarchie');
+  $form['form_benchmark_settings']['benchmarks_show_drilldown_in_own_hierarchie'] = array(
+    '#type' => 'radios',
+    '#title' => t('Show drilldown in own hierarchie'),
+//    '#description' => t(''),
+    '#options' => [
+      'yes' => t('Yes'),
+      'no' => t('No'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'benchmarks_max_amount_organisations');
+  $form['form_benchmark_settings']['benchmarks_max_amount_organisations'] = array(
+    '#type' => 'number',
+    '#title' => t('Minimum amount of organisations'),
+//    '#description' => t(''),
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'benchmarks_download_benchmark_data');
+  $form['form_benchmark_settings']['benchmarks_download_benchmark_data'] = array(
+    '#type' => 'radios',
+    '#title' => t('Download Benchmark data'),
+//    '#description' => t(''),
+    '#options' => [
+      'yes' => t('Yes'),
+      'no' => t('No'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'benchmarks_show_average_to_much_organisations');
+  $form['form_benchmark_settings']['benchmarks_show_average_to_much_organisations'] = array(
+    '#type' => 'radios',
+    '#title' => t('Show average when there are to much organisations'),
+//    '#description' => t(''),
+    '#options' => [
+      'yes' => t('Yes'),
+      'no' => t('No'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'benchmarks_use_estimate_in_calculations');
+  $form['form_benchmark_settings']['benchmarks_use_estimate_in_calculations'] = array(
+    '#type' => 'radios',
+    '#title' => t('Use "Estimate/Not 100% reliable" in calculations'),
+//    '#description' => t(''),
+    '#options' => [
+      'yes' => t('Yes'),
+      'no' => t('No'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $form['form_benchmark_settings']['filter_options'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Filters'),
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'benchmarks_filters_compare_with');
+  $form['form_benchmark_settings']['filter_options']['benchmarks_filters_compare_with'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Compare with'),
+    //    '#description' => t(''),
+    '#options' => [
+      'individual' => t('Individual scores'),
+      'average' => t('The average')
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : [],
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'benchmarks_filters_show_levels');
+  $form['form_benchmark_settings']['filter_options']['benchmarks_filters_show_levels'] = array(
+    '#type' => 'radios',
+    '#title' => t('Show level/filters'),
+    //    '#description' => t(''),
+    '#options' => [
+      'yes' => t('Yes'),
+      'no' => t('No'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $form['form_benchmark_settings']['diagrams_options'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Diagrams'),
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'benchmarks_diagrams_show_min_max_lines');
+  $form['form_benchmark_settings']['diagrams_options']['benchmarks_diagrams_show_min_max_lines'] = array(
+    '#type' => 'radios',
+    '#title' => t('Show min/max lines'),
+    //    '#description' => t(''),
+    '#options' => [
+      'yes' => t('Yes'),
+      'no' => t('No'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'benchmarks_diagrams_show_average_lines');
+  $form['form_benchmark_settings']['diagrams_options']['benchmarks_diagrams_show_average_lines'] = array(
+    '#type' => 'radios',
+    '#title' => t('Show average lines'),
+    //    '#description' => t(''),
+    '#options' => [
+      'yes' => t('Yes'),
+      'no' => t('No'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'benchmarks_diagrams_type_line_charts');
+  $form['form_benchmark_settings']['diagrams_options']['benchmarks_diagrams_type_line_charts'] = array(
+    '#type' => 'radios',
+    '#title' => t('Type line charts'),
+    //    '#description' => t(''),
+    '#options' => [
+      'line' => t('Line'),
+      'spline' => t('Spline'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'benchmarks_diagrams_show_minor_tick_line');
+  $form['form_benchmark_settings']['diagrams_options']['benchmarks_diagrams_show_minor_tick_line'] = array(
+    '#type' => 'radios',
+    '#title' => t('Show minor tick line'),
+    //    '#description' => t(''),
+    '#options' => [
+      'yes' => t('yes'),
+      'no' => t('no'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'benchmarks_diagrams_show_chart_while_scrolling_view');
+  $form['form_benchmark_settings']['diagrams_options']['benchmarks_diagrams_show_chart_while_scrolling_view'] = array(
+    '#type' => 'radios',
+    '#title' => t('Show chart while scrolling view'),
+    //    '#description' => t(''),
+    '#options' => [
+      'yes' => t('yes'),
+      'no' => t('no'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $val = $entity->getThirdPartySetting('ip_webform', 'benchmarks_diagrams_show_maps_view');
+  $form['form_benchmark_settings']['diagrams_options']['benchmarks_diagrams_show_maps_view'] = array(
+    '#type' => 'radios',
+    '#title' => t('Show maps view'),
+    //    '#description' => t(''),
+    '#options' => [
+      'yes' => t('yes'),
+      'no' => t('no'),
+    ],
+    '#required' => FALSE,
+    '#default_value' => ($val) ? $val : '',
+  );
+
+  $form['actions']['submit']['#submit'][] = '_custom_cpl_gtm_submit';
+}
+
+function _custom_cpl_gtm_submit($form, \Drupal\Core\Form\FormStateInterface $form_state) {
+  /** @var \Drupal\webform\WebformInterface $entity */
+  if ($entity = $form_state->getFormObject()->getEntity()) {
+    $entity->setThirdPartySetting('ip_webform', 'cycle_name', $form_state->getValue('cycle_name'));
+    $entity->setThirdPartySetting('ip_webform', 'cycle_short_name', $form_state->getValue('cycle_short_name'));
+    $entity->setThirdPartySetting('ip_webform', 'explanation_text', $form_state->getValue('explanation_text'));
+    $entity->setThirdPartySetting('ip_webform', 'data_entry', $form_state->getValue('data_entry'));
+    $entity->setThirdPartySetting('ip_webform', 'security_benchmarking', $form_state->getValue('security_benchmarking'));
+    $entity->setThirdPartySetting('ip_webform', 'public_benchmarking', $form_state->getValue('public_benchmarking'));
+    $entity->setThirdPartySetting('ip_webform', 'reports', $form_state->getValue('reports'));
+    $entity->setThirdPartySetting('ip_webform', 'news', $form_state->getValue('news'));
+    $entity->setThirdPartySetting('ip_webform', 'recent_question_list', $form_state->getValue('recent_question_list'));
+    $entity->setThirdPartySetting('ip_webform', 'overview_text', $form_state->getValue('overview_text'));
+
+    // input_data
+    $entity->setThirdPartySetting('ip_webform', 'input_data_show_estimate_reliable', $form_state->getValue('input_data_show_estimate_reliable'));
+    $entity->setThirdPartySetting('ip_webform', 'input_data_show_remarks', $form_state->getValue('input_data_show_remarks'));
+    $entity->setThirdPartySetting('ip_webform', 'input_data_show_description_popup', $form_state->getValue('input_data_show_description_popup'));
+
+    // benchmarks
+    $entity->setThirdPartySetting('ip_webform', 'benchmarks_show_individual_res', $form_state->getValue('benchmarks_show_individual_res'));
+    $entity->setThirdPartySetting('ip_webform', 'benchmarks_show_drilldown_in_own_hierarchie', $form_state->getValue('benchmarks_show_drilldown_in_own_hierarchie'));
+    $entity->setThirdPartySetting('ip_webform', 'benchmarks_max_amount_organisations', $form_state->getValue('benchmarks_max_amount_organisations'));
+    $entity->setThirdPartySetting('ip_webform', 'benchmarks_download_benchmark_data', $form_state->getValue('benchmarks_download_benchmark_data'));
+    $entity->setThirdPartySetting('ip_webform', 'benchmarks_show_average_to_much_organisations', $form_state->getValue('benchmarks_show_average_to_much_organisations'));
+    $entity->setThirdPartySetting('ip_webform', 'benchmarks_use_estimate_in_calculations', $form_state->getValue('benchmarks_use_estimate_in_calculations'));
+
+
+    // benchmark filters
+    $entity->setThirdPartySetting('ip_webform', 'benchmarks_filters_compare_with', $form_state->getValue('benchmarks_filters_compare_with'));
+    $entity->setThirdPartySetting('ip_webform', 'benchmarks_filters_show_levels', $form_state->getValue('benchmarks_filters_show_levels'));
+
+    // benchmark diagrams
+    $entity->setThirdPartySetting('ip_webform', 'benchmarks_diagrams_show_min_max_lines', $form_state->getValue('benchmarks_diagrams_show_min_max_lines'));
+    $entity->setThirdPartySetting('ip_webform', 'benchmarks_diagrams_show_average_lines', $form_state->getValue('benchmarks_diagrams_show_average_lines'));
+    $entity->setThirdPartySetting('ip_webform', 'benchmarks_diagrams_type_line_charts', $form_state->getValue('benchmarks_diagrams_type_line_charts'));
+    $entity->setThirdPartySetting('ip_webform', 'benchmarks_diagrams_show_minor_tick_line', $form_state->getValue('benchmarks_diagrams_show_minor_tick_line'));
+    $entity->setThirdPartySetting('ip_webform', 'benchmarks_diagrams_show_chart_while_scrolling_view', $form_state->getValue('benchmarks_diagrams_show_chart_while_scrolling_view'));
+    $entity->setThirdPartySetting('ip_webform', 'benchmarks_diagrams_show_maps_view', $form_state->getValue('benchmarks_diagrams_show_maps_view'));
+
+    $entity->save();
+  }
+}

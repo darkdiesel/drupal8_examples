@@ -1,0 +1,9 @@
+name: Ip React App
+type: module
+description: Download and Update React App
+package: Ip
+core: 8.x
+
+dependencies:
+  - ip_webform_api
+  - ip_settings

@@ -1,0 +1,57 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function ip_webform_schema()
+{
+  $schema['ip_webform_logs'] = array(
+    'description' => t('Stores user activity logs according to each webform.'),
+    'fields' => array(
+      'lid' => array(
+        'description' => 'Primary identifier for log.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE
+      ),
+      'uid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => t('The {user}.uid of the user crated the log.')
+      ),
+      'webform' => array(
+        'description' => 'The human-readable name of webform.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''
+      ),
+      'log' => array(
+        'description' => 'Log text',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'medium'
+      ),
+      'timestamp' => array(
+        'description' => 'A Unix timestamp indicating when this log was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0
+      ),
+    ),
+    'foreign keys' => array(
+      'node_author' => array(
+        'table' => 'users',
+        'columns' => array(
+          'uid' => 'uid',
+        ),
+      ),
+    ),
+    'primary key' => array(
+      'lid',
+    )
+  );
+
+  return $schema;
+}

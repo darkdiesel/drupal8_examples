@@ -1,0 +1,52 @@
+ip_webform.main:
+  path: '/admin/structure/webform_create'
+  defaults:
+    _title: 'Create webform'
+    _form: '\Drupal\ip_webform\Form\IpWebformCreateForm'
+  requirements:
+    _permission: 'import content'
+
+ip_webform.dashboard:
+  path: '/user/webform_dashboard'
+  defaults:
+    _title: 'Webform dashboard'
+    _form: '\Drupal\ip_webform\Form\IpWebformDashboardForm'
+  requirements:
+    _permission: 'access content'
+    _webform_auth_check: 'TRUE'
+
+ip_webform.edit:
+  path: '/user/webform_dashboard/{webform}'
+  defaults:
+    _title: 'Webform edit'
+    _form: '\Drupal\ip_webform\Form\IpWebformEditForm'
+  requirements:
+    _permission: 'access content'
+    _webform_author_check: 'TRUE'
+
+ip_webform.delete_element:
+  path: '/user/webform_dashboard/{webform}/elements/{element}/delete'
+  defaults:
+    _controller: '\Drupal\ip_webform\Controller\IpWebformEditController::deleteElement'
+  requirements:
+    _permission: 'access content'
+    _webform_author_check: 'TRUE'
+
+
+ip_webform.logs:
+  path: '/user/webform_dashboard/{webform}/logs'
+  defaults:
+    _title: 'Webform logs'
+    _controller: '\Drupal\ip_webform\Controller\IpWebformLogsController::webFormLogs'
+  requirements:
+    _permission: 'access content'
+    _webform_auth_check: 'TRUE'
+
+ip_webform.results.csv:
+  path: '/user/webform_dashboard/{webform}/csv_results'
+  defaults:
+    _title: 'Webform CSV Results'
+    _controller: '\Drupal\ip_webform\Controller\IpWebformResultsController::webFormCSResults'
+  requirements:
+    _permission: 'access content'
+    _webform_auth_check: 'TRUE'

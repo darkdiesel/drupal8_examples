@@ -1,0 +1,78 @@
+.webform-validation-rules-table td {
+  white-space: nowrap;
+}
+
+tr.webform-validation-rules-table--rule {
+  border-top: 2px solid #a6a6a6;
+}
+
+tr.webform-validation-rules-table--rule:first-child {
+  border-top: inherit;
+}
+
+tr.webform-validation-rules-table--rule td select {
+  width: inherit;
+  max-width: inherit;
+}
+
+.webform-validation-rules-table--rule td.webform-validation-rules-table--rule select,
+.webform-validation-rules-table--rule select,
+.webform-validation-rules-table--rule input[type="text"] {
+  width: 100%;
+  max-width: 100%;
+}
+
+.webform-validation-rules-table--rule input[type="text"] {
+  margin-top: 4px;
+}
+
+.webform-validation-rules-table .image-button {
+  margin: 0;
+}
+
+.webform-validation-rules-table th.webform-validation-rules-table--operations,
+.webform-validation-rules-table td.webform-validation-rules-table--operations {
+  padding: 0 2px;
+  vertical-align: middle;
+}
+
+.webform-validation-rules-table td.webform-validation-rules-table--operations input[type="image"] {
+  opacity: 0.4;
+  box-sizing: border-box;
+  width: 20px;
+  min-width: initial;
+  max-width: initial;
+  border: 2px solid #333;
+  border-radius: 50%;
+  padding: 2px;
+}
+
+.webform-validation-rules-table td.webform-validation-rules-table--operations input[type="image"] + input[type="image"] {
+  margin-left: 2px;
+}
+
+.webform-validation-rules-table td.webform-validation-rules-table--operations input[type="image"]:hover,
+.webform-validation-rules-table td.webform-validation-rules-table--operations input[type="image"]:focus,
+.webform-validation-rules-table td.webform-validation-rules-table--operations input[type="image"]:active {
+  opacity: 1;
+  background: none;
+}
+
+/**
+ * Suppress table drag warnings.
+ */
+.webform-validation-rules-table .tabledrag-changed-warning,
+.webform-validation-rules-table .tabledrag-changed {
+  display: none !important; /* Must use !important because .tabledrag-changed 'display' is set via JavaScript */
+}
+
+/**
+ * Limit results in jQuery UI Autocomplete
+ *
+ * https://stackoverflow.com/questions/7617373/limit-results-in-jquery-ui-autocomplete
+ */
+.ui-autocomplete {
+  max-height: 200px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}

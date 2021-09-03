@@ -1,0 +1,215 @@
+<?php
+
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\ip_indicator\Model\IpIndicatorModel;
+use Drupal\ip_indicator\Model\IpIndicatorWebformModel;
+
+function ip_indicator_form_alter(&$form, FormStateInterface $form_state)
+{
+  if ($form['#form_id'] == 'webform_add_form' || $form['#form_id'] == 'webform_duplicate_form') {
+    $form['id']['#default_value'] = IpIndicatorWebformModel::key();
+
+    foreach (array_keys($form['actions']) as $action) {
+      if ($action != 'preview' && isset($form['actions'][$action]['#type']) && $form['actions'][$action]['#type'] === 'submit') {
+        // $form['actions'][$action]['#submit'][] = 'ip_indicator_element_form_submit';
+        $form['actions'][$action]['#validate'][] = 'ip_indicator_webform_validate';
+      }
+    }
+  }
+
+  if ($form['#form_id'] == 'webform_edit_form') {
+    $webform = $form_state->getFormObject()->getEntity();
+    $webform_id = $webform->id();
+
+    $form['webform_ui_elements']['#header'] = array_slice($form['webform_ui_elements']['#header'], 0, 1, true) +
+      ['indicator' => ['data' => t('Indicator')]] +
+      array_slice($form['webform_ui_elements']['#header'], 1, count($form['webform_ui_elements']['#header']) - 1, true);
+
+    foreach ($form['webform_ui_elements'] as $key => $element) {
+      if ($key[0] != '#' && $key != 'actions') {
+        $form['webform_ui_elements'][$key] = array_slice($form['webform_ui_elements'][$key], 0, 2, true) +
+          ['indicator' => ['#markup' => IpIndicatorModel::get($webform_id, $key)]] +
+          array_slice($form['webform_ui_elements'][$key], 2, count($form['webform_ui_elements'][$key]) - 2, true);
+      } else if ($key == 'actions') {
+        $form['webform_ui_elements'][$key] = array_slice($form['webform_ui_elements'][$key], 0, 2, true) +
+          ['indicator' => ['#markup' => '']] +
+          array_slice($form['webform_ui_elements'][$key], 2, count($form['webform_ui_elements'][$key]) - 2, true);
+      }
+    }
+
+    foreach (array_keys($form['actions']) as $action) {
+      if ($action != 'preview' && isset($form['actions'][$action]['#type']) && $form['actions'][$action]['#type'] === 'submit') {
+        $form['actions'][$action]['#submit'][] = 'ip_indicator_form_submit';
+      }
+    }
+  }
+
+  if ($form['#form_id'] == 'webform_settings_form') {
+    $element = $form['general_settings']['id']['#value'];
+    $webform = \Drupal::routeMatch()->getParameter('webform');
+
+    if (!empty($element)) {
+      $form['general_settings']['indicator'] = [
+        '#type' => 'textfield',
+        '#title' => t('Indicator'),
+        '#default_value' => IpIndicatorWebformModel::get($webform->id()),
+        '#id' => 'indicator',
+        '#required' => true
+        // '#return_value' => IpIndicatorModel::get($webform->id(), $element)
+      ];
+    } else {
+      $form['general_settings']['indicator'] = [
+        '#type' => 'textfield',
+        '#title' => t('Indicator'),
+        '#default_value' => IpIndicatorWebformModel::add($webform->id()),
+        '#id' => 'indicator',
+        '#required' => true
+        // '#return_value' => IpIndicatorModel::get($webform->id(), $element)
+      ];
+    }
+
+    foreach (array_keys($form['actions']) as $action) {
+      if ($action != 'preview' && isset($form['actions'][$action]['#type']) && $form['actions'][$action]['#type'] === 'submit') {
+        // $form['actions'][$action]['#submit'][] = 'ip_indicator_element_form_submit';
+        $form['actions'][$action]['#validate'][] = 'ip_indicator_webform_validate';
+      }
+    }
+  }
+
+  if ($form['#form_id'] == 'webform_ui_element_form') {
+    if (isset($form['properties']['element']['key']['#default_value'])) {
+      $element = $form['properties']['element']['key']['#default_value'];
+    } else {
+      $element = '';
+    }
+
+    $webform = \Drupal::routeMatch()->getParameter('webform');
+
+    if (empty($element)) {
+      $form['properties']['element']['key']['#default_value'] = IpIndicatorModel::key($webform->id());
+    }
+
+    if (!empty($element)) {
+      $form['properties']['element']['indicator'] = [
+        '#type' => 'textfield',
+        '#title' => t('Indicator'),
+        '#default_value' => IpIndicatorModel::get($webform->id(), $element),
+        '#id' => 'indicator',
+        '#required' => true
+        // '#return_value' => IpIndicatorModel::get($webform->id(), $element)
+      ];
+    }
+
+    foreach (array_keys($form['actions']) as $action) {
+      if ($action != 'preview' && isset($form['actions'][$action]['#type']) && $form['actions'][$action]['#type'] === 'submit') {
+        // $form['actions'][$action]['#submit'][] = 'ip_indicator_element_form_submit';
+        $form['actions'][$action]['#validate'][] = 'ip_indicator_element_validate';
+      }
+    }
+
+    // $form['#validate'][] = 'ip_indicator_element_validate';
+  }
+}
+
+function create_elements($webform_id, $elements, $category)
+{
+  foreach ($elements as $key => $element) {
+    if ($key[0] != '#' && $key != 'actions') {
+      IpIndicatorModel::add($webform_id, $key, $element['#type'] == 'category_container', $category);
+    }
+
+    if (isset($element['#type']) && $element['#type'] == 'category_container') {
+      create_elements($webform_id, $element, $key);
+    }
+  }
+}
+
+function ip_indicator_form_submit($form, FormStateInterface $form_state)
+{
+  $webform = $form_state->getFormObject()->getEntity();
+  $webform_id = $webform->id();
+  $elements = $webform->getElementsDecoded();
+
+  create_elements($webform_id, $elements, '');
+
+  return true;
+}
+
+function ip_indicator_element_form_submit($form, FormStateInterface $form_state)
+{
+  $indicator = \Drupal::request()->request->get('indicator');
+
+  if (!empty($indicator)) {
+    $webform = \Drupal::routeMatch()->getParameter('webform');
+    $element = \Drupal::routeMatch()->getParameter('key');
+
+    IpIndicatorModel::update($webform->id(), $element, \Drupal::request()->request->get('indicator'));
+  }
+
+  return true;
+}
+
+function ip_indicator_webform_form_submit($form, FormStateInterface $form_state)
+{
+  $indicator = \Drupal::request()->request->get('indicator');
+
+  if (!empty($indicator)) {
+    $webform = \Drupal::routeMatch()->getParameter('webform');
+
+    IpIndicatorWebformModel::update($webform->id(), \Drupal::request()->request->get('indicator'));
+  }
+
+  return true;
+}
+
+function ip_indicator_element_validate($form, FormStateInterface $form_state)
+{
+  $errors = $form_state->getErrors();
+
+  if (isset($errors['key']) && $errors['key'] == t('The machine-readable name is already in use. It must be unique.')) {
+    $form_state->setErrorByName('key', '');
+    $form_state->clearErrors();
+
+    unset($errors['key']);
+
+    foreach ($errors as $key => $error) {
+      $form_state->setErrorByName($key, $error);
+    }
+
+    $value = $_POST['key'];
+    $value = explode('_', $value);
+    $value = intval($value[count($value) - 1]) + 1;
+
+    $key = $_POST['key'];
+    if ($value > 1) {
+      $key = substr($key, 0, strlen($key) - 2);
+    }
+
+    $form['properties']['element']['key']['#value'] = $key . '_' . $value;
+    $_POST['key'] = $form['properties']['element']['key']['#value'];
+  }
+
+  $webform = \Drupal::routeMatch()->getParameter('webform');
+  $element = \Drupal::routeMatch()->getParameter('key');
+
+  if (IpIndicatorModel::exist($webform->id(), $element, \Drupal::request()->request->get('indicator'))) {
+    $form_state->setErrorByName('indicator', t('Indicator is duplicated'));
+  } else {
+    ip_indicator_element_form_submit($form, $form_state);
+  }
+}
+
+function ip_indicator_webform_validate($form, FormStateInterface $form_state)
+{
+  $webform = \Drupal::routeMatch()->getParameter('webform');
+
+  if (!empty($webform) && IpIndicatorWebformModel::exist($webform->id(), \Drupal::request()->request->get('indicator'))) {
+    $form_state->setErrorByName('indicator', t('Indicator is duplicated'));
+  } else if (!empty($webform)) {
+    ip_indicator_webform_form_submit($form, $form_state);
+  } else {
+    if (count($form_state->getErrors()) == 0) {
+      IpIndicatorWebformModel::add($_POST['id']);
+    }
+  }
+}

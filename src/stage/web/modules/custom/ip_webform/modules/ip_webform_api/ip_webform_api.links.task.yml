@@ -1,0 +1,72 @@
+# yaml file to define one or more local task(s).
+#
+# Definitions can contain any of the following:
+# title: (required) The untranslated title of the menu link.
+# description: The untranslated description of the link.
+# route_name: (optional) The route name to be used to build the path. Either a
+#   route_name or a link_path must be provided.
+# base_route: Used to group together related tabs.
+# parent_id: Use the parent_id to relate a tab to a parent tab for multiple
+#   levels of tabs.
+# route_parameters: (optional) The route parameters to build the path. An array.
+# link_path: (optional) If you have an external link use link_path instead of
+#   providing a route_name.
+# weight: (optional) An integer that determines the relative position of items
+#   in the menu; higher-weighted items sink. Defaults to 0.
+#   Menu items with the same weight are ordered alphabetically.
+# options: (optional) An array of options to be passed to l() when generating
+#   a link from this menu item.
+
+ip_webform_api.detail.info_tab:
+  route_name : ip_webform_api.detail.info
+  title: Datail Info
+  base_route: ip_webform_api.detail.info
+  weight: 10
+
+ip_webform_api.detail.logs_tab:
+  route_name: ip_webform_api.detail.logs
+  title: Task Logs
+  base_route: ip_webform_api.detail.info
+  weight: 20
+
+ip_webform_api.tasks_tab:
+  route_name : ip_webform_api
+  title: Tasks
+  base_route: ip_webform_api
+  weight: 10
+
+ip_webform_api.tasks_tab.all:
+  title: All
+  route_name : ip_webform_api
+  parent_id: ip_webform_api.tasks_tab
+  weight: 0
+
+ip_webform_api.tasks_tab.pending:
+  title: Pending
+  route_name : ip_webform_api.tasks.pending
+  parent_id: ip_webform_api.tasks_tab
+  weight: 10
+
+ip_webform_api.tasks_tab.processing:
+  title: In Progress
+  route_name : ip_webform_api.tasks.processing
+  parent_id: ip_webform_api.tasks_tab
+  weight: 20
+
+ip_webform_api.tasks_tab.finished:
+  title: Finished
+  route_name : ip_webform_api.tasks.finished
+  parent_id: ip_webform_api.tasks_tab
+  weight: 30
+
+ip_webform_api.tasks_tab.failed:
+  title: Failed
+  route_name : ip_webform_api.tasks.failed
+  parent_id: ip_webform_api.tasks_tab
+  weight: 40
+
+ip_webform_api.logs_tab:
+  route_name : ip_webform_api.logs
+  title: Logs
+  base_route: ip_webform_api
+  weight: 10

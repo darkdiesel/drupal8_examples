@@ -1,0 +1,5 @@
+ip_react_app.admin_config_media:
+  title: 'Ip React App'
+  description: 'Build and Update React App'
+  route_name: ip_react_app.main
+  parent: 'system.admin_config_media'

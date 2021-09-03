@@ -1,0 +1,12 @@
+services:
+  ip_webform.access_checker:
+    class: Drupal\ip_webform\Access\AuthAccess
+    arguments: ['@current_user']
+    tags:
+      - { name: access_check, applies_to: _webform_auth_check }
+
+  ip_webform.author_checker:
+    class: Drupal\ip_webform\Access\AuthorAccess
+    arguments: ['@current_user']
+    tags:
+      - { name: access_check, applies_to: _webform_author_check}

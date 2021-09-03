@@ -1,0 +1,9 @@
+name: Ip Reports Request
+type: module
+description: Provide functionality for creating request for reports
+package: Ip
+core: 8.x
+
+dependencies:
+  - ip_users
+  - ip_webform_api

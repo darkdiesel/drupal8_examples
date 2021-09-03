@@ -1,0 +1,5 @@
+ip_organisations.organisations_export_page:
+  title: 'Organisations Export / Import'
+  description: 'Provide functionality exporting organisations list to csv file'
+  route_name: ip_organisations.export
+  parent: system.admin_config_development

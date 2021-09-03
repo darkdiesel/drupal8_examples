@@ -1,0 +1,9 @@
+name: Ip Webform API
+type: module
+description: Works with webforms
+package: Ip
+core: 8.x
+
+dependencies:
+  - ip_webform
+  - ip_indicator

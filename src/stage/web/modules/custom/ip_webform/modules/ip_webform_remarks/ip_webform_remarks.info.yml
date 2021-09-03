@@ -1,0 +1,9 @@
+name: Ip Webform Remarks
+type: module
+description: Add remarks for webform fields
+package: Ip
+core: 8.x
+
+dependencies:
+  - webform
+  - ip_indicator

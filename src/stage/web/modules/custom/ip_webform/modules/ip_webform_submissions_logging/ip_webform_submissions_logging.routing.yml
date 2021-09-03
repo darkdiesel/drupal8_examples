@@ -1,0 +1,31 @@
+ip_webform_submissions_logging.logs_by_submission:
+  path: '/admin/structure/webform/manage/{webform}/submission/{webform_submission}/logs'
+  defaults:
+    _controller: '\Drupal\ip_webform_submissions_logging\Controller\IpWebformSubmissionLogsController::webFormLogsBySubmission'
+    _title: 'Logs'
+  requirements:
+    _entity_access: 'webform.submission_view_any'
+    _custom_access: '\Drupal\webform\Access\WebformEntityAccess:checkResultsAccess'
+  options:
+    parameters:
+      webform:
+        type: 'entity:webform'
+      webform_submission:
+        type: 'entity:webform_submission'
+    _webform_auth_check: 'TRUE'
+    _admin_route: 'TRUE'
+
+ip_webform_submissions_logging.logs_by_webform:
+  path: '/admin/structure/webform/manage/{webform}/results/logs'
+  defaults:
+    _controller: '\Drupal\ip_webform_submissions_logging\Controller\IpWebformSubmissionLogsController::webFormLogsByWebform'
+    _title: 'Logs'
+  requirements:
+    _entity_access: 'webform.submission_view_any'
+    _custom_access: '\Drupal\webform\Access\WebformEntityAccess:checkResultsAccess'
+  options:
+    parameters:
+      webform:
+        type: 'entity:webform'
+    _webform_auth_check: 'TRUE'
+    _admin_route: 'TRUE'

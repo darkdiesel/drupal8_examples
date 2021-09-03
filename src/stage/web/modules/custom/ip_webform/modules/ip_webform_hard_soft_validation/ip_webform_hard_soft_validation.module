@@ -1,0 +1,153 @@
+<?php
+
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\webform\WebformSubmissionInterface;
+use Drupal\ip_webform_hard_soft_validation\WebformCustomValidationRulesValidator;
+
+/**
+ * Implements hook_form_alter().
+ *
+ * @param $form
+ * @param \Drupal\Core\Form\FormStateInterface $form_state
+ * @param $form_id
+ *
+ */
+function ip_webform_hard_soft_validation_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
+  if (isset($form['#webform_id'])) {
+    $form['#validate'][] = '_ip_webform_hard_soft_validation_form_validate';
+  }
+}
+
+
+/**
+ * Validate elements with custom validation
+ *
+ * @param $form
+ * @param \Drupal\Core\Form\FormStateInterface $form_state
+ */
+function _ip_webform_hard_soft_validation_form_validate(&$form, \Drupal\Core\Form\FormStateInterface $form_state) {
+  if (isset($form['#webform_id'])) {
+    $webfrom_submission = $form_state->getFormObject()->getEntity();
+
+    if ($webfrom_submission instanceof webformSubmissionInterface) {
+      $webform    = $webfrom_submission->getWebform();
+      //$webform_id = $webform->id();
+      $elements   = $webform->getElementsInitializedAndFlattened();
+
+      //$values = $form_state->getValues();
+
+      $submission_data = $webfrom_submission->getData();
+
+      foreach ($elements as $key => $element) {
+        if (isset($element['#validation']['custom_validation'])) {
+
+          $validation = WebformCustomValidationRulesValidator::validateElement($element, $submission_data);
+
+          if (count($validation['soft'])) {
+            $warnings = $form_state->get('warnings');
+
+            if (!$warnings) {
+              $warnings = [];
+            }
+
+            foreach ($validation['soft'] as $warning) {
+              if (!isset($warnings[$key])) {
+                $warnings[$key] = [];
+              }
+
+              $warnings[$key][] = $warning;
+              \Drupal::messenger()->addWarning($warning);
+            }
+
+            $form_state->set('warnings',
+              $warnings
+            );
+          }
+
+          if (count($validation['hard'])) {
+            foreach ($validation['hard'] as $error) {
+              $form_state->setErrorByName($key, $error);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * @param $form
+ * @param \Drupal\Core\Form\FormStateInterface $form_state
+ * @param $form_id
+ *
+ * @return mixed
+ */
+function ip_webform_hard_soft_validation_form_webform_ui_element_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  if (!isset($form['properties']['validation'])) {
+    return $form;
+  }
+
+  // Define default custom properties.
+  $default_custom_validation = [
+    'validation' => [
+      'custom_validation' => FALSE,
+      'validation_rules' => [],
+    ],
+  ];
+
+  // @see \Drupal\webform\Plugin\WebformElementBase::getConfigurationFormProperties
+  $form_state->set(
+    'default_properties',
+    $form_state->get('default_properties') + $default_custom_validation
+  );
+
+  $custom_properties = $form['properties']['custom']['properties']['#default_value'];
+
+  $form['properties']['custom']['properties']['#default_value'] = array_diff_key(
+    $custom_properties,
+    $default_custom_validation
+  );
+
+  // Finally, append the default custom property values.
+  $custom_properties += $default_custom_validation;
+
+  $form['properties']['validation']['custom_validation_details'] = [
+    '#type'        => 'details',
+    '#title'       => t('Custom validation'),
+    '#description' => t('The below custom validation provide functionality for creating soft and hard validation rules.'),
+    '#open'        => TRUE,
+  ];
+
+  $form['properties']['validation']['custom_validation_details']['custom_validation'] = [
+    '#type'          => 'checkbox',
+    '#title'         => t("Enable Custom Validation"),
+    '#description'   => t('Check this option if you want to enable custom validation rules.'),
+    '#required'      => FALSE,
+    '#return_value'  => TRUE,
+    '#parents'       => ['properties', 'validation', 'custom_validation'],
+    '#default_value' => $custom_properties['validation']['custom_validation'],
+  ];
+
+  $form['properties']['validation']['custom_validation_details']['validation_rules'] = [
+      '#type' => 'webform_element_validation_rules',
+      '#disabled_message' => TRUE,
+      "#states" => [
+        "visible" => [
+          ':input[name="properties[validation][custom_validation]"]' => ['checked' => TRUE],
+        ]
+      ],
+      '#parents'       => ['properties', 'validation', 'validation_rules'],
+      '#default_value' => $custom_properties['validation']['validation_rules'],
+      '#required' => FALSE,
+    ];
+
+}
+
+/**
+ * Implements hook_webform_element_alter().
+ */
+function ip_webform_hard_soft_validation_webform_element_alter(array &$element, FormStateInterface $form_state, array $context) {
+  if (!empty($element['#validation']['custom_validation'])) {
+    $element['#attributes']['data-custom-validation'] = $element['#validation']['custom_validation'];
+  }
+}

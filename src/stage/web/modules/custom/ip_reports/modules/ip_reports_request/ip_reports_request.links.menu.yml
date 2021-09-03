@@ -1,0 +1,11 @@
+ip_reports_request.admin_reports:
+  title: 'Questionnaire Reports'
+  description: 'Creating & Downloading Reports'
+  route_name: ip_reports_request.reports
+  parent: system.admin_reports
+
+ip_reports_request.cron_tasks_admin_reports:
+  title: 'Cron Tasks - Reports'
+  description: 'Stores tasks for reports requests. That will be processed to calculation service.'
+  route_name: ip_reports_request.cron_tasks_base
+  parent: system.admin_reports

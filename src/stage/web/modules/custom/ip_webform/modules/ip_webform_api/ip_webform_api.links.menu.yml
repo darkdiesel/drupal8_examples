@@ -1,0 +1,5 @@
+ip_webform_api.cron_tasks:
+  title: 'Cron Tasks - Webform Submissions'
+  description: 'Stores tasks for webforms and submissions. That will be processed to calculation service.'
+  route_name: ip_webform_api
+  parent: system.admin_reports

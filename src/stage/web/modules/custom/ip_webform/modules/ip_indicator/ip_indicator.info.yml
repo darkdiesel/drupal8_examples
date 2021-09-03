@@ -1,0 +1,5 @@
+name: Ip Indicator
+type: module
+description: Attach numeric indicators for webform
+package: Ip
+core: 8.x

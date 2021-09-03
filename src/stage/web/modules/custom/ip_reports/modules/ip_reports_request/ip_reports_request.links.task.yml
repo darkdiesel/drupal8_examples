@@ -1,0 +1,65 @@
+ip_reports_request.reports_tab:
+  route_name: ip_reports_request.reports
+  title: Reports list
+  base_route: ip_reports_request.reports
+  weight: 10
+
+ip_reports_request.create_report_tab:
+  route_name : ip_reports_request.create_report
+  title: Create Report
+  base_route: ip_reports_request.reports
+  weight: 20
+
+# cron tasks for reports
+ip_reports_request.task_detail.info_tab:
+  route_name : ip_reports_request.cron_tasks.task_detail
+  title: Datail Info
+  base_route: ip_reports_request.cron_tasks.task_detail
+  weight: 10
+ip_reports_request.task_detail.logs_tab:
+  route_name: ip_reports_request.cron_tasks.task_detail.logs
+  title: Task Logs
+  base_route: ip_reports_request.cron_tasks.task_detail
+  weight: 20
+
+ip_reports_request.cron_tasks_tab:
+  route_name : ip_reports_request.cron_tasks_base
+  title: Tasks
+  base_route: ip_reports_request.cron_tasks_base
+  weight: 10
+
+ip_reports_request.cron_tasks_tab.all:
+  title: All
+  route_name : ip_reports_request.cron_tasks_base
+  parent_id: ip_reports_request.cron_tasks_tab
+  weight: 0
+
+ip_reports_request.cron_tasks_tab.pending:
+  title: Pending
+  route_name : ip_reports_request.cron_tasks.pending
+  parent_id: ip_reports_request.cron_tasks_tab
+  weight: 10
+
+ip_reports_request.cron_tasks_tab.processing:
+  title: In Progress
+  route_name : ip_reports_request.cron_tasks.processing
+  parent_id: ip_reports_request.cron_tasks_tab
+  weight: 20
+
+ip_reports_request.cron_tasks_tab.finished:
+  title: Finished
+  route_name : ip_reports_request.cron_tasks.finished
+  parent_id: ip_reports_request.cron_tasks_tab
+  weight: 30
+
+ip_reports_request.cron_tasks_tab.failed:
+  title: Failed
+  route_name : ip_reports_request.cron_tasks.failed
+  parent_id: ip_reports_request.cron_tasks_tab
+  weight: 40
+
+ip_reports_request.cron_tasks_logs_tab:
+  route_name : ip_reports_request.cron_tasks_logs
+  title: Logs
+  base_route: ip_reports_request.cron_tasks_base
+  weight: 10

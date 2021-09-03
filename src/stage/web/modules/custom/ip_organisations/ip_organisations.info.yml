@@ -1,0 +1,5 @@
+name: Ip Organisations
+type: module
+description: Provide functionality for organisations
+package: Ip
+core: 8.x

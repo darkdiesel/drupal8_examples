@@ -1,0 +1,5 @@
+ip_webform.main:
+  title: 'Create webform'
+  description: 'Create new webform from template'
+  route_name: ip_webform.main
+  parent: system.admin_structure

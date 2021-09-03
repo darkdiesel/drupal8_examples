@@ -1,0 +1,606 @@
+<?php
+
+use Drupal\ip_reports_request\Controller\IpReportRequestCalculationServiceController;
+use Drupal\ip_reports_request\Model\IpReportsRequestsModel;
+use Drupal\ip_users\Controller\IpUserDataController;
+use Drupal\ip_reports_request\Model\IpReportsRequestsTasksModel;
+use Drupal\ip_reports_request\Model\IpReportsRequestsTasksLogModel;
+use Drupal\ip_webform_api\Model\IpWebformApiTasksModel;
+use Drupal\ip_reports_request\Controller\IpReportRequestController;
+
+/**
+ * Implements hook_ENTITY_TYPE_insert()
+ *
+ * @param $webform_submission
+ *
+ * @throws \Exception
+ */
+function ip_reports_request_webform_submission_insert($webform_submission) {
+  $sid     = $webform_submission->id();
+  $webform = $webform_submission->getWebform();
+  $wid     = $webform->id();
+
+  if ($webform_submission->isCompleted()) {
+
+    if (!\Drupal::currentUser()->isAnonymous()) {
+      $organisation = IpUserDataController::getOrganisation(\Drupal::currentUser());
+
+      if (!$organisation) {
+        $organisation = NULL;
+      }
+
+      $task = IpReportsRequestsTasksModel::add(t("Send Report; webform:@webform; submission:@submission; organisation:@organisation", [
+        '@webform'      => $wid,
+        '@submission'   => $sid,
+        '@organisation' => $organisation,
+      ]), $wid, $sid, $organisation);
+
+      IpReportsRequestsTasksLogModel::add($task, t("Task to send report for calculation created. Submission: @submission, form: @webform, organisation: @organisation.", [
+        '@submission'   => $sid,
+        '@webform'      => $wid,
+        '@organisation' => $organisation,
+      ]));
+    }
+  }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_update()
+ *
+ * @param $webform_submission
+ *
+ * @throws \Exception
+ */
+function ip_reports_request_webform_submission_update($webform_submission) {
+  $sid     = $webform_submission->id();
+  $webform = $webform_submission->getWebform();
+  $wid     = $webform->id();
+
+  if ($webform_submission->isCompleted()) {
+    // if user not anonymous
+    if (!\Drupal::currentUser()->isAnonymous()) {
+      // get user organisation
+      $organisation = IpUserDataController::getOrganisation(\Drupal::currentUser());
+
+      if (!$organisation) {
+        $organisation = NULL;
+      }
+
+      $task = IpReportsRequestsTasksModel::add(t("Regenerate Report; webform:@webform; submission:@submission; organisation:@organisation", [
+        '@webform'      => $wid,
+        '@submission'   => $sid,
+        '@organisation' => $organisation,
+      ]), $wid, $sid, $organisation);
+
+      IpReportsRequestsTasksLogModel::add($task, t("Task to regenerate report for calculation created. Submission: @submission, Webform: @webform, Organisation: @organisation.", [
+        '@submission'   => $sid,
+        '@webform'      => $wid,
+        '@organisation' => $organisation,
+      ]));
+    }
+  }
+}
+
+/**
+ * Delete reports assigned to deleted submission
+ *
+ * Implements hook_ENTITY_TYPE_delete()
+ *
+ * @param \Drupal\webform\WebformSubmissionInterface $webform_submission
+ *
+ * @return bool
+ */
+function ip_reports_request_webform_submission_delete(\Drupal\webform\WebformSubmissionInterface $webform_submission) {
+  $webform = $webform_submission->getWebform();
+  $wid     = $webform->id();
+  $sid     = $webform_submission->id();
+
+  $report_request_service = new IpReportRequestCalculationServiceController();
+  $report_requests        = IpReportsRequestsModel::getAlByWebformSubmissionID($wid, $sid);
+
+  if (!$report_requests) {
+    return TRUE;
+  }
+
+  foreach ($report_requests as $report_request) {
+    // delete report from db
+    IpReportsRequestsModel::delete($report_request->report_id);
+
+    // send request to delete report from calculation service
+    $report_request_service->deleteReport($report_request->report_node_id, $report_request->remote_report_id);
+  }
+
+  return TRUE;
+}
+
+/**
+ *
+ * Delete reports when node with report content type deleted.
+ * Delete all reports from drupal db and send requests to delete reports from
+ * calculation service
+ *
+ * Implements hook_ENTITY_TYPE_delete() for node report.
+ *
+ * @param \Drupal\Core\Entity\EntityInterface $entity
+ *
+ * @return bool
+ */
+function ip_reports_node_delete(Drupal\Core\Entity\EntityInterface $entity) {
+  if ($entity->getType() == 'report') {
+    $id = $entity->id();
+
+    $report_request_service = new IpReportRequestCalculationServiceController();
+    $report_requests        = IpReportsRequestsModel::getAllByNodeReportID($id);
+
+    if (!$report_requests) {
+      return TRUE;
+    }
+
+    foreach ($report_requests as $report_request) {
+      // delete report from db
+      IpReportsRequestsModel::delete($report_request->report_id);
+
+      // send request to delete report from calculation service
+      $report_request_service->deleteReport($id, $report_request->remote_report_id);
+    }
+  }
+}
+
+/**
+ * Implements hook_cron()
+ */
+function ip_reports_request_cron() {
+  _ip_reports_request_cron_send_report();
+  _ip_reports_request_cron_check_report();
+}
+
+/**
+ * Tasks for cron that process (send, delete, regenerate) reports for
+ * submissions
+ *
+ * @return bool
+ */
+function _ip_reports_request_cron_send_report() {
+  try {
+    // task and logger models for reports
+    $task_model     = new IpReportsRequestsTasksModel();
+    $task_log_model = new IpReportsRequestsTasksLogModel();
+
+    // service where we will send submissions for calculation results
+    $calculationService = new IpReportRequestCalculationServiceController();
+
+    $tasks = $task_model->getLastInProgressLimit();
+
+    foreach ($tasks as $row => $task) {
+      //TODO: check status
+
+      if ($task->task) {
+        $task_params = explode(";", $task->task);
+
+        if (!is_array($task_params) || !count($task_params)) {
+          $task_model->setStatusError($task->task_id);
+          $task_log_model->add($task->task_id, t("Task closed with status Error for reason task params not founded."));
+          continue;
+        }
+
+        switch (strtolower(trim($task_params[0]))) {
+          case 'send report':
+            $params = _ip_reports_request_task_parse_form_submission($task_params);
+
+            if ($params === FALSE) {
+              // Close task with error, params not parsed.
+              $task_model->setStatusError($task->task_id);
+              $task_log_model->add($task->task_id, t("Task closed with status Error for reason can't parse webform and submission."));
+
+              break;
+            }
+
+            // check if submission sent
+            //@TODO get submission by webform, organisation, and submission id?
+            $webform_submission_task = IpWebformApiTasksModel::getByWebformSubmission($task->webform_id, $task->submission_id);
+
+            // if submission in pending, pending, failed then stop this task
+            if (!$webform_submission_task) {
+              break;
+            }
+            elseif (in_array($webform_submission_task->status, [
+              IpWebformApiTasksModel::STATUS_PENDING,
+              IpWebformApiTasksModel::STATUS_PROCESSING,
+            ])) {
+              break;
+            }
+            elseif (in_array($webform_submission_task->status, [IpWebformApiTasksModel::STATUS_ERROR])) {
+              $task_model->setStatusError($task->task_id);
+              $task_log_model->add($task->task_id, t("Task closed with status Error for reason submission not processed."));
+              break;
+            }
+
+            $conditions = [
+              'organisation_id' => $task->organisation_id,
+              'submission_id'   => $task->submission_id,
+            ];
+
+            // get reports structure nodes
+            $values = [
+              'type'                 => 'report',
+              'field_report_webform' => $task->webform_id,
+            ];
+
+
+            $report_structure_nodes = \Drupal::entityTypeManager()
+                                             ->getStorage('node')
+                                             ->loadByProperties($values);
+
+            foreach ($report_structure_nodes as $report_structure) {
+              // create report in calculation service
+              $create_report_result = $calculationService->createReport($report_structure->id(), $conditions);
+
+              if ($create_report_result !== FALSE) {
+                $task_model->setStatusFinish($task->task_id);
+                $task_log_model->add($task->task_id, t("Task closed with status Finished."));
+
+                // save report state in drupal db
+                $report = IpReportsRequestsModel::add($task->uid, $report_structure->id(), $create_report_result['report']['id'], $task->webform_id, $task->submission_id, $conditions);
+
+                $status = strtolower($create_report_result['report']['status']);
+
+                switch ($status) {
+                  case IpReportsRequestsModel::STATUS_PENDING:
+                    IpReportsRequestsModel::setStatusPending($report);
+                    break;
+                  case IpReportsRequestsModel::STATUS_PROCESSING:
+                    IpReportsRequestsModel::setStatusProcessing($report);
+                    break;
+                  case IpReportsRequestsModel::STATUS_ERROR:
+                    IpReportsRequestsModel::setStatusError($report);
+                    break;
+                  case IpReportsRequestsModel::STATUS_FINISHED:
+                    $site_id = $calculationService->getSiteID();
+
+                    IpReportsRequestsModel::update($report, [
+                      'result' => IpReportRequestController::buildSerializedResults($report_structure->id(), $create_report_result['report']['id'], $site_id),
+                    ]);
+                    IpReportsRequestsModel::setStatusFinish($report);
+                    break;
+                  default:
+                    break;
+                }
+              }
+              else {
+                \Drupal::logger('ip_reports_request')
+                       ->error(t('Error on creating report request'));
+
+                $task_log_model->add($task->task_id, t("Some error occurred while sending report create request ."));
+              }
+            }
+
+            break;
+          case 'regenerate report':
+            $params = _ip_reports_request_task_parse_form_submission($task_params);
+
+            if ($params === FALSE) {
+              // Close task with error, params not parsed.
+              $task_model->setStatusError($task->task_id);
+              $task_log_model->add($task->task_id, t("Task closed with status Error for reason can't parse webform and submission."));
+
+              break;
+            }
+
+            // check if submission sent
+            //@TODO get submission by webform, organisation, and submission id?
+            $webform_submission_task = IpWebformApiTasksModel::getByWebformSubmission($task->webform_id, $task->submission_id);
+
+            // if submission in pending, pending, failed then stop this task
+            if (!$webform_submission_task) {
+              break;
+            }
+            elseif (in_array($webform_submission_task->status, [
+              IpWebformApiTasksModel::STATUS_PENDING,
+              IpWebformApiTasksModel::STATUS_PROCESSING,
+            ])) {
+              break;
+            }
+            elseif (in_array($webform_submission_task->status, [IpWebformApiTasksModel::STATUS_ERROR])) {
+              $task_model->setStatusError($task->task_id);
+              $task_log_model->add($task->task_id, t("Task closed with status Error for reason - attached submission processed with error."));
+              break;
+            }
+
+            $conditions = [
+              'organisation_id' => $task->organisation_id,
+              'submission_id'   => $task->submission_id,
+            ];
+
+            // get reports structure nodes
+            $values = [
+              'type'                 => 'report',
+              'field_report_webform' => $task->webform_id,
+            ];
+
+
+            $report_structure_nodes = \Drupal::entityTypeManager()
+                                             ->getStorage('node')
+                                             ->loadByProperties($values);
+
+            if (is_array($report_structure_nodes) && count($report_structure_nodes) == 0) {
+              $task_model->setStatusFinish($task->task_id);
+
+              $msg = t("Task @task_id closed with status Finished. No reports attached for for webform:@webform and submission:@submission.", [
+                '@task_id'    => $task->task_id,
+                '@webform'    => $task->webform_id,
+                '@submission' => $task->submission_id,
+              ]);
+
+              $task_log_model->add($task->task_id, $msg);
+
+              \Drupal::logger('ip_reports_request')->info($msg);
+            }
+
+            foreach ($report_structure_nodes as $report_structure) {
+              $report = IpReportsRequestsModel::getByNodeReportWebformSubmissionID($report_structure->id(), $task->webform_id, $task->submission_id);
+
+              if ($report) {
+                // regenerate existing report
+
+                $regenerate_report_result = $calculationService->regenerateReport($report_structure->id(), $report->remote_report_id);
+
+                if ($regenerate_report_result !== FALSE) {
+                  $task_model->setStatusFinish($task->task_id);
+
+                  $msg = t("Report regenerated request sent for webform:@webform and submission:@submission with report structure: @report.", [
+                    '@webform'    => $task->webform_id,
+                    '@submission' => $task->submission_id,
+                    '@report'     => $report->remote_report_id,
+                  ]);
+
+                  $task_log_model->add($task->task_id, $msg);
+
+                  \Drupal::logger('ip_reports_request')->info($msg);
+
+                  // Update report status
+                  $status = strtolower($regenerate_report_result['report']['status']);
+
+                  switch ($status) {
+                    case IpReportsRequestsModel::STATUS_PENDING:
+                      IpReportsRequestsModel::setStatusPending($report->report_id);
+                      break;
+                    case IpReportsRequestsModel::STATUS_PROCESSING:
+                      IpReportsRequestsModel::setStatusProcessing($report->report_id);
+                      break;
+                    case IpReportsRequestsModel::STATUS_ERROR:
+                      IpReportsRequestsModel::setStatusError($report->report_id);
+                      break;
+                    case IpReportsRequestsModel::STATUS_FINISHED:
+                      $site_id = $calculationService->getSiteID();
+
+                      IpReportsRequestsModel::update($report->report_id, [
+                        'result' => IpReportRequestController::buildSerializedResults($report_structure->id(), $regenerate_report_result['report']['id'], $site_id),
+                      ]);
+                      IpReportsRequestsModel::setStatusFinish($report->report_id);
+                      break;
+                    default:
+                      break;
+                  }
+                }
+              }
+              else {
+                // report not exist - create new report
+                $create_report_result = $calculationService->createReport($report_structure->id(), $conditions);
+
+
+                if ($create_report_result !== FALSE) {
+                  $task_model->setStatusFinish($task->task_id);
+
+                  $msg = t("Report create request sent for webform:@webform and submission:@submission with report structure: @report.", [
+                    '@webform'    => $task->webform_id,
+                    '@submission' => $task->submission_id,
+                    '@report'     => $report_structure->id(),
+                  ]);
+
+                  $task_log_model->add($task->task_id, $msg);
+
+                  \Drupal::logger('ip_reports_request')->info($msg);
+
+                  // save report state in drupal db
+                  $report = IpReportsRequestsModel::add($task->uid, $report_structure->id(), $create_report_result['report']['id'], $task->webform_id, $task->submission_id, $conditions);
+
+                  $status = strtolower($create_report_result['report']['status']);
+
+                  switch ($status) {
+                    case IpReportsRequestsModel::STATUS_PENDING:
+                      IpReportsRequestsModel::setStatusPending($report);
+                      break;
+                    case IpReportsRequestsModel::STATUS_PROCESSING:
+                      IpReportsRequestsModel::setStatusProcessing($report);
+                      break;
+                    case IpReportsRequestsModel::STATUS_ERROR:
+                      IpReportsRequestsModel::setStatusError($report);
+                      break;
+                    case IpReportsRequestsModel::STATUS_FINISHED:
+                      $site_id = $calculationService->getSiteID();
+
+                      IpReportsRequestsModel::update($report, [
+                        'result' => IpReportRequestController::buildSerializedResults($report_structure->id(), $create_report_result['report']['id'], $site_id),
+                      ]);
+                      IpReportsRequestsModel::setStatusFinish($report);
+                      break;
+                    default:
+                      break;
+                  }
+                }
+                else {
+                  \Drupal::logger('ip_reports_request')
+                         ->error(t('Error on creating report request'));
+
+                  $task_log_model->add($task->task_id, t("Some error occurred while sending report create request ."));
+                }
+              }
+            }
+            break;
+          default:
+            $task_model->setStatusFinish($task->task_id);
+            $task_log_model->add($task->task_id, t("Task closed with status Finished for reason task process function not founded."));
+            break;
+        }
+      }
+    }
+
+  } catch (\Exception $e) {
+    \Drupal::logger('ip_reports_request')
+           ->error(t('Something went wrong during processing tasks. Please contact site administrator.'));
+    \Drupal::logger('ip_reports_request')->error($e->getMessage());
+    return FALSE;
+  }
+}
+
+/**
+ * Task for cron that check details for report generating in calculation service
+ *
+ * @return bool
+ */
+function _ip_reports_request_cron_check_report() {
+  try {
+    // Calculation service for report
+    $report_request_service = new IpReportRequestCalculationServiceController();
+
+    $reports = IpReportsRequestsModel::getLastInProgressLimit();
+
+    foreach ($reports as $report) {
+      $result = $report_request_service->getReportDetails($report->report_node_id, $report->remote_report_id);
+
+      if ($result !== FALSE) {
+        if (isset($result['success']) && $result['success']) {
+
+          if (isset($result['report']['status']) && isset($result['report']['id'])) {
+            $status = strtolower($result['report']['status']);
+
+            switch ($status) {
+              case IpReportsRequestsModel::STATUS_PENDING:
+                IpReportsRequestsModel::setStatusPending($report->report_id);
+                break;
+              case IpReportsRequestsModel::STATUS_PROCESSING:
+                IpReportsRequestsModel::setStatusProcessing($report->report_id);
+                break;
+              case IpReportsRequestsModel::STATUS_ERROR:
+                IpReportsRequestsModel::setStatusError($report->report_id);
+                break;
+              case IpReportsRequestsModel::STATUS_FINISHED:
+                $site_id = $report_request_service->getSiteID();
+
+                IpReportsRequestsModel::update($report->report_id, [
+                  'result' => IpReportRequestController::buildSerializedResults($report->report_node_id, $result['report']['id'], $site_id),
+                ]);
+
+                IpReportsRequestsModel::setStatusFinish($report->report_id);
+                break;
+              default:
+                break;
+            }
+          }
+        }
+      }
+      else {
+        \Drupal::logger('ip_reports_request')
+               ->error(t('Errors on checking report details'));
+        return FALSE;
+      }
+    }
+
+  } catch (\Exception $e) {
+    \Drupal::logger('ip_reports_request')
+           ->error(t('Something went wrong during processing reports. Please contact site administrator.'));
+    \Drupal::logger('ip_reports_request')->error($e->getMessage());
+    return FALSE;
+  }
+}
+
+function _ip_reports_request_task_parse_form_submission($params) {
+  if ((isset($params[1]) && isset($params[2]) && (trim($params[1]) && trim($params[2])))) {
+
+    // check and get webform
+    $task_webform_params = explode(":", trim($params[1]));
+
+    if (is_array($task_webform_params) && count($task_webform_params)) {
+      if (!isset($task_webform_params[0]) || strtolower(trim($task_webform_params[0])) != 'webform') {
+        return FALSE;
+      }
+
+      if (!isset($task_webform_params[1]) || !trim($task_webform_params[1])) {
+        return FALSE;
+      }
+    }
+
+    // check and get submission
+    $task_submission_params = explode(":", trim($params[2]));
+
+    if (is_array($task_submission_params) && count($task_submission_params)) {
+      if (!isset($task_submission_params[0]) || strtolower(trim($task_submission_params[0])) != 'submission') {
+        return FALSE;
+      }
+
+      if (!isset($task_submission_params[1]) || !trim($task_submission_params[1])) {
+        return FALSE;
+      }
+    }
+
+    // check and get organisation
+    $task_organisation_params = explode(":", trim($params[3]));
+
+    if (is_array($task_organisation_params) && count($task_organisation_params)) {
+      if (!isset($task_organisation_params[0]) || strtolower(trim($task_organisation_params[0])) != 'organisation') {
+        return FALSE;
+      }
+
+      if (!isset($task_organisation_params[1]) || !trim($task_organisation_params[1])) {
+        $task_organisation_params[1] = NULL;
+      }
+    }
+
+    return [
+      'webform'      => $task_webform_params[1],
+      'submission'   => $task_submission_params[1],
+      'organisation' => $task_organisation_params[1],
+    ];
+  }
+  else {
+    return FALSE;
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function ip_reports_request_theme($existing, $type, $theme, $path) {
+  return [
+    'webform_handler_ip_reports_on_confirmation_page_summary ' => [
+      'variables' => ['settings' => NULL, 'handler' => []],
+    ],
+  ];
+}
+
+
+/**
+ * Implements hook_ENTITY_TYPE_insert().
+ */
+function ip_reports_request_webform_insert(\Drupal\webform\WebformInterface $webform) {
+  /** @var \Drupal\webform\Plugin\WebformHandlerManagerInterface $handler_manager */
+  $handler_manager = \Drupal::service('plugin.manager.webform.handler');
+
+  // Define webform handler configuration.
+  $handlerConfiguration = [
+    'id'         => 'ip_reports_on_confirmation_page',
+    'label'      => 'Reports on Confirmation Page',
+    'handler_id' => 'reports_on_confirmation_page',
+    'status'     => 1,
+    'weight'     => 1,
+    'settings'   => [],
+  ];
+
+  $handler = $handler_manager->createInstance('ip_reports_on_confirmation_page', $handlerConfiguration);
+
+  // Must set original id so that the webform can be resaved.
+  $webform->setOriginalId($webform->id());
+
+  // Add webform handler which triggers Webform::save().
+  $webform->addWebformHandler($handler);
+}

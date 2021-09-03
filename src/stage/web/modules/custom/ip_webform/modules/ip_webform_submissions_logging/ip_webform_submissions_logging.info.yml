@@ -1,0 +1,9 @@
+name: Ip Webform Submissions Logging
+type: module
+description: Logging webform submissions data changin
+package: Ip
+core: 8.x
+
+dependencies:
+  - webform
+  - ip_webform

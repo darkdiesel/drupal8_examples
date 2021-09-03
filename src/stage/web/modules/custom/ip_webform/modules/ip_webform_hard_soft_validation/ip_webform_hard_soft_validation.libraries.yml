@@ -1,0 +1,11 @@
+ip_webform_hard_soft_validation.element.validation_rules:
+  version: VERSION
+  css:
+    component:
+      css/webform.element.validation_rules.css: {}
+  js:
+    js/webform.element.validation_rules.js: {}
+  dependencies:
+    - core/drupal
+    - core/jquery.once
+    - core/jquery.ui.autocomplete

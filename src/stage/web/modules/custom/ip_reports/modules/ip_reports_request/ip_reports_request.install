@@ -1,0 +1,347 @@
+<?php
+
+use Drupal\Core\Database\Database;
+
+/**
+ * Implements hook_schema().
+ */
+function ip_reports_request_schema() {
+  $schema['ip_reports_requests'] = [
+    'description' => t('Stores reports requests information.'),
+    'fields'      => [
+      'report_id'        => [
+        'description' => 'Primary identifier for report.',
+        'type'        => 'serial',
+        'unsigned'    => TRUE,
+        'not null'    => TRUE,
+      ],
+      'remote_report_id' => [
+        'description' => 'Remote identifier for report',
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+      ],
+      'report_node_id'   => [
+        'description' => 'Node identifier for report',
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+      ],
+      'uid'              => [
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+        'description' => t('The {user}.uid of the user created this report request.'),
+      ],
+      'webform_id'       => [
+        'type'        => 'varchar',
+        'length'      => 256,
+        'not null'    => TRUE,
+        'default'     => '',
+        'description' => t('The webform id.'),
+      ],
+      'submission_id'    => [
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+        'description' => t('The submission id.'),
+      ],
+      'organisation_id'  => [
+        'type'        => 'int',
+        'not null'    => FALSE,
+        'default'     => NULL,
+        'description' => t('The if of the organisation created this report request.'),
+      ],
+      'conditions'       => [
+        'description' => 'Report conditions',
+        'type'        => 'blob',
+        'not null'    => TRUE,
+        'size'        => 'big',
+        //'default' => serialize([])
+      ],
+      'status'           => [
+        'description' => 'Report calculation status',
+        'type'        => 'varchar',
+        'length'      => 256,
+        'not null'    => TRUE,
+        'default'     => '',
+      ],
+      'result'           => [
+        'description' => 'Report calculation result links',
+        'type'        => 'blob',
+        'not null'    => TRUE,
+        'size'        => 'big',
+        //'default' => serialize([])
+      ],
+      'created_at'       => [
+        'description' => 'A Unix timestamp indicating when this task was created.',
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+      ],
+      'updated_at'       => [
+        'description' => 'A Unix timestamp indicating when this task was updated.',
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+      ],
+    ],
+    'indexes'     => [
+      'remote_report_id' => ['remote_report_id'],
+      'report_node_id'   => ['report_node_id'],
+    ],
+    'primary key' => [
+      'report_id',
+    ],
+  ];
+
+  $schema['ip_reports_requests_tasks'] = [
+    'description' => t('Stores api task information for reports requests.'),
+    'fields'      => [
+      'task_id'         => [
+        'type'        => 'serial',
+        'unsigned'    => TRUE,
+        'not null'    => TRUE,
+        'description' => 'Primary identifier for api task.',
+      ],
+      'task'            => [
+        'description' => 'Task text',
+        'type'        => 'text',
+        'not null'    => TRUE,
+        'size'        => 'medium',
+      ],
+      'uid'              => [
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+        'description' => t('The {user}.uid of the user created this report request.'),
+      ],
+      'webform_id'      => [
+        'type'        => 'varchar',
+        'length'      => 256,
+        'not null'    => TRUE,
+        'default'     => '',
+        'description' => t('The webform id.'),
+      ],
+      'submission_id'   => [
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+        'description' => t('The submission id.'),
+      ],
+      'organisation_id' => [
+        'type'        => 'int',
+        'not null'    => FALSE,
+        'default'     => NULL,
+        'description' => t('The organisation id.'),
+      ],
+      'conditions'      => [
+        'description' => 'Report conditions',
+        'type'        => 'blob',
+        'not null'    => TRUE,
+        'size'        => 'big',
+        //'default' => serialize([])
+      ],
+      'status'          => [
+        'type'        => 'varchar',
+        'length'      => 256,
+        'not null'    => TRUE,
+        'default'     => '',
+        'description' => 'Task status',
+      ],
+      'created_at'      => [
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+        'description' => 'A Unix timestamp indicating when this task was created.',
+      ],
+      'updated_at'      => [
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+        'description' => 'A Unix timestamp indicating when this task was updated.',
+      ],
+    ],
+    'primary key' => [
+      'task_id',
+    ],
+  ];
+
+  $schema['ip_reports_requests_tasks_logs'] = [
+    'description'  => t('Stores task information logs according to each task.'),
+    'fields'       => [
+      'log_id'     => [
+        'type'        => 'serial',
+        'unsigned'    => TRUE,
+        'not null'    => TRUE,
+        'description' => 'Primary identifier for log.',
+      ],
+      'task_id'    => [
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+        'description' => t('The {user}.uid of the user crating the link.'),
+      ],
+      'message'    => [
+        'description' => 'Log text',
+        'type'        => 'text',
+        'not null'    => TRUE,
+        'size'        => 'medium',
+      ],
+      'created_at' => [
+        'type'        => 'int',
+        'not null'    => TRUE,
+        'default'     => 0,
+        'description' => 'A Unix timestamp indicating when this log was created.',
+      ],
+    ],
+    'foreign keys' => [
+      'task_id' => [
+        'table'   => 'ip_reports_requests_tasks',
+        'columns' => [
+          'task_id' => 'task_id',
+        ],
+      ],
+    ],
+    'primary key'  => [
+      'log_id',
+    ],
+  ];
+
+  return $schema;
+}
+
+
+/**
+ * Add organisation id to reports request table
+ */
+function ip_reports_request_update_8002() {
+  $field_spc = [
+    'type'        => 'int',
+    'not null'    => FALSE,
+    'default'     => NULL,
+    'description' => t('The if of the organisation created this report request.'),
+  ];
+
+  if (!Database::getConnection()
+               ->schema()
+               ->fieldExists('ip_reports_requests', 'organisation_id')) {
+    Database::getConnection()
+            ->schema()
+            ->addField('ip_reports_requests', 'organisation_id', $field_spc);
+  }
+}
+
+
+/**
+ * Add tasks and task logs tables
+ */
+function ip_reports_request_update_8003() {
+  if (!Database::getConnection()
+               ->schema()
+               ->tableExists('ip_reports_requests_tasks')) {
+    $table = drupal_get_module_schema('ip_reports_request', 'ip_reports_requests_tasks');
+
+    Database::getConnection()
+            ->schema()
+            ->createTable('ip_reports_requests_tasks', $table);
+  }
+
+  if (!Database::getConnection()
+               ->schema()
+               ->tableExists('ip_reports_requests_tasks_logs')) {
+    $table = drupal_get_module_schema('ip_reports_request', 'ip_reports_requests_tasks_logs');
+
+    Database::getConnection()
+            ->schema()
+            ->createTable('ip_reports_requests_tasks_logs', $table);
+  }
+}
+
+/**
+ * Add webform and submission id to reports request table
+ */
+function ip_reports_request_update_8004() {
+  $field_spc = [
+    'type'        => 'varchar',
+    'length'      => 256,
+    'not null'    => TRUE,
+    'default'     => '',
+    'description' => t('The webform id.'),
+  ];
+
+  if (!Database::getConnection()
+               ->schema()
+               ->fieldExists('ip_reports_requests', 'webform_id')) {
+    Database::getConnection()
+            ->schema()
+            ->addField('ip_reports_requests', 'webform_id', $field_spc);
+  }
+
+  $field_spc = [
+    'type'        => 'int',
+    'not null'    => TRUE,
+    'default'     => 0,
+    'description' => t('The submission id.'),
+  ];
+
+  if (!Database::getConnection()
+               ->schema()
+               ->fieldExists('ip_reports_requests', 'submission_id')) {
+    Database::getConnection()
+            ->schema()
+            ->addField('ip_reports_requests', 'submission_id', $field_spc);
+  }
+}
+
+/**
+ * Apply reports on confirmation page for anonymous users handler for all forms
+ */
+function ip_reports_request_update_8005() {
+  /** @var \Drupal\webform\Plugin\WebformHandlerManagerInterface $handler_manager */
+  $handler_manager = \Drupal::service('plugin.manager.webform.handler');
+  $webformStorage  = \Drupal::entityTypeManager()->getStorage('webform');
+
+  // Define webform handler configuration.
+  $handlerConfiguration = [
+    'id'         => 'ip_reports_on_confirmation_page',
+    'label'      => 'Reports on Confirmation Page',
+    'handler_id' => 'reports_on_confirmation_page',
+    'status'     => 1,
+    'weight'     => 1,
+    'settings'   => [],
+  ];
+
+  foreach ($webformStorage->loadMultiple() as $webform) {
+    if ($webform->access('submission_create', NULL)) {
+      $webform_handlers = $webform->getHandlers();
+
+      if (!$webform_handlers->has('ip_reports_on_confirmation_page')) {
+        $handler = $handler_manager->createInstance('ip_reports_on_confirmation_page', $handlerConfiguration);
+        $webform->setOriginalId($webform->id());
+        $webform->addWebformHandler($handler);
+      }
+    }
+  }
+
+}
+
+/**
+ * Add uid field for reports tasks
+ */
+function ip_reports_request_update_8006() {
+  $field_spc = [
+    'type'        => 'int',
+    'not null'    => TRUE,
+    'default'     => 0,
+    'description' => t('The {user}.uid of the user created this report request.'),
+  ];
+
+  if (!Database::getConnection()
+               ->schema()
+               ->fieldExists('ip_reports_requests_tasks', 'uid')) {
+    Database::getConnection()
+            ->schema()
+            ->addField('ip_reports_requests_tasks', 'uid', $field_spc);
+  }
+}

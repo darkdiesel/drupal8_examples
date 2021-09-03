@@ -1,0 +1,129 @@
+ip_reports_request.reports:
+  path: '/admin/reports/ip_reports_request'
+  defaults:
+    _controller: '\Drupal\ip_reports_request\Controller\IpReportRequestListController::reportsList'
+    _title: 'Reports list'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_reports_request.reports.detail:
+  path: '/admin/reports/ip_reports_request/report/{report_id}'
+  defaults:
+    _controller: '\Drupal\ip_reports_request\Controller\IpReportRequestListController::reportDetail'
+    _title: 'Report detail'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_reports_request.create_report:
+  path: '/admin/reports/ip_reports_request/create'
+  defaults:
+    _form: '\Drupal\ip_reports_request\Form\IpReportRequestReportForm'
+    _title: 'Create Report'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_reports_request.delete_report:
+  path: '/admin/reports/ip_reports_request/report/{report_id}/delete'
+  defaults:
+    _form: '\Drupal\ip_reports_request\Form\IpReportRequestConfirmDeleteForm'
+    _title: 'Create Report'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_reports_request.cron_tasks_base:
+  path: '/admin/reports/ip_reports_request_cron_tasks'
+  defaults:
+    _controller: '\Drupal\ip_reports_request\Controller\TaskLogsController::cronTasks'
+    _title: 'Cron Tasks - Reports | All Tasks'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_reports_request.cron_tasks:
+  path: '/admin/reports/ip_reports_request_cron_tasks/tasks'
+  defaults:
+    _controller: '\Drupal\ip_reports_request\Controller\TaskLogsController::cronTasks'
+    _title: 'Cron Tasks - Reports | All Tasks'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_reports_request.cron_tasks.pending:
+  path: '/admin/reports/ip_reports_request_cron_tasks/tasks/pending'
+  defaults:
+    _controller: '\Drupal\ip_reports_request\Controller\TaskLogsController::pendingTasks'
+    _title: 'Cron Tasks - Reports | Pending Tasks'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_reports_request.cron_tasks.processing:
+  path: '/admin/reports/ip_reports_request_cron_tasks/tasks/processing'
+  defaults:
+    _controller: '\Drupal\ip_reports_request\Controller\TaskLogsController::processingTasks'
+    _title: 'Cron Tasks - Reports | Tasks in Progress'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_reports_request.cron_tasks.finished:
+  path: '/admin/reports/ip_reports_request_cron_tasks/tasks/finished'
+  defaults:
+    _controller: '\Drupal\ip_reports_request\Controller\TaskLogsController::finishedTasks'
+    _title: 'Cron Tasks - Reports | Finished Tasks'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_reports_request.cron_tasks.failed:
+  path: '/admin/reports/ip_reports_request_cron_tasks/tasks/failed'
+  defaults:
+    _controller: '\Drupal\ip_reports_request\Controller\TaskLogsController::failedTasks'
+    _title: 'Cron Tasks - Reports | Failed Tasks'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_reports_request.cron_tasks_logs:
+  path: '/admin/reports/ip_reports_request_cron_tasks/logs'
+  defaults:
+    _controller: '\Drupal\ip_reports_request\Controller\TaskLogsController::cronTasksLogs'
+    _title: 'Cron Tasks - Reports | All Logs'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_reports_request.cron_tasks.task_detail:
+  path: '/admin/reports/ip_reports_request_cron_tasks/{task_id}/info'
+  defaults:
+    _controller: '\Drupal\ip_reports_request\Controller\TaskLogsController::taskDetail'
+    _title: 'Cron Tasks - Webform Submissions | Task detail'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_reports_request.cron_tasks.task_detail.logs:
+  path: '/admin/reports/ip_reports_request_cron_tasks/{task_id}/logs'
+  defaults:
+    _controller: '\Drupal\ip_reports_request\Controller\TaskLogsController::taskDetailLogs'
+    _title: 'Cron Tasks - Webform Submissions | Task detail logs'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'

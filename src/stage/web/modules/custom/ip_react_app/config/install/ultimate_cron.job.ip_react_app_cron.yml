@@ -1,0 +1,29 @@
+uuid: 2c9701c5-0cf7-4901-96db-25e853ac02ca
+langcode: en
+status: true
+dependencies:
+  module:
+    - ip_react_app
+title: 'Default cron handler'
+id: ip_react_app_cron
+weight: 0
+module: ip_react_app
+callback: ip_react_app_cron
+scheduler:
+  id: simple
+  configuration:
+    rules:
+      - '* * * * *'
+launcher:
+  id: serial
+  configuration:
+    timeouts:
+      lock_timeout: 7200
+    launcher:
+      thread: 0
+logger:
+  id: database
+  configuration:
+    method: '3'
+    expire: 1209600
+    retain: 1000

@@ -1,0 +1,7 @@
+ip_react_app.main:
+  path: '/admin/config/media/ip_react_app'
+  defaults:
+    _form: '\Drupal\ip_react_app\Form\IpReactAppDownloadForm'
+    _title: 'Ip React App'
+  requirements:
+    _permission: 'administer'

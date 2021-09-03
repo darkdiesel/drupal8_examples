@@ -1,0 +1,5 @@
+name: Ip Settings
+type: module
+description: Ip basic settings
+package: Ip
+core: 8.x

@@ -1,0 +1,119 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function ip_webform_remarks_schema()
+{
+  $schema['ip_webform_remarks'] = array(
+    'description' => t('Stores remarks for fields based on webform indicators.'),
+    'fields' => array(
+      'remark_id' => array(
+        'description' => 'Primary identifier for remark.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE
+      ),
+      'uid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => t('The {user}.uid of the user crating the remark.')
+      ),
+      'organisation_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => t('The organisation where this remark will be displayed.')
+      ),
+      'indicator' => array(
+        'description' => 'Field indicator.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''
+      ),
+      'text' => array(
+        'description' => 'Log text',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'medium'
+      ),
+      'created_at' => array(
+        'description' => 'A Unix timestamp indicating when this remark was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0
+      ),
+      'updated_at' => array(
+        'description' => 'A Unix timestamp indicating when this remark was updated.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0
+      ),
+    ),
+    'foreign keys' => array(
+      'node_author' => array(
+        'table' => 'users',
+        'columns' => array(
+          'uid' => 'uid',
+        ),
+      ),
+    ),
+    'indexes' => array(
+      'indicator'     => array('indicator')
+    ),
+    'primary key' => array(
+      'remark_id',
+    )
+  );
+
+  $schema['ip_webform_remarks_logs'] = [
+    'description' => t('Stores task information logs according to each task.'),
+    'fields' => [
+      'log_id' => [
+        'description' => 'Primary identifier for log.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ],
+      'uid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => t('The {user}.uid of the user crating the remark update.')
+      ),
+      'remark_id' => [
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => t('Linked remark.')
+      ],
+      'message' => [
+        'description' => 'Log text',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'medium',
+      ],
+      'created_at' => [
+        'description' => 'A Unix timestamp indicating when this log was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ],
+    ],
+    'foreign keys' => array(
+      'task_id' => array(
+        'table' => 'ip_webform_remarks',
+        'columns' => array(
+          'remark_id' => 'remark_id',
+        ),
+      ),
+    ),
+    'primary key' => [
+      'log_id',
+    ],
+  ];
+
+  return $schema;
+}

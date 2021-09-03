@@ -1,0 +1,6 @@
+ip_settings.settings:
+  title: 'Ip Settings'
+  route_name: ip_settings.settings
+  description: 'Manage ip settings.'
+  parent: system.admin_config_system
+  weight: 50

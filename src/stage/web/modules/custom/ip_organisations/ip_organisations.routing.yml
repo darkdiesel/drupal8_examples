@@ -1,0 +1,39 @@
+ip_organisations.export:
+  path: '/admin/config/development/ip_export_organisation_csv'
+  defaults:
+    _controller: '\Drupal\ip_organisations\Controller\IpOrganisationsExportCSVController::exportOrganisationsPage'
+    _title: 'Export Organisations to CSV'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_organisations.export.csv:
+  path: '/admin/config/development/ip_export_organisation_csv/get_report'
+  defaults:
+    _controller: '\Drupal\ip_organisations\Controller\IpOrganisationsExportCSVController::createReport'
+    _title: 'Get Organisations CSV File'
+  requirements:
+    _permission: 'administer content types'
+  options:
+    _admin_route: 'TRUE'
+
+ip_organisations.import:
+  path: '/admin/config/development/ip_import_organisation_csv'
+  defaults:
+    _form: '\Drupal\ip_organisations\Form\IpOrganisationsImportCSVForm'
+    _title: 'Import Organisations from CSV'
+  requirements:
+    _permission: 'import content'
+  options:
+    _admin_route: 'TRUE'
+
+#ip_organisations.import.csv:
+#  path: '/admin/config/development/ip_import_organisation_csv/send_report'
+#  defaults:
+#    _controller: '\Drupal\ip_organisations\Controller\IpOrganisationsImportCSVController::createReport'
+#    _title: 'Get Organisations CSV File'
+#  requirements:
+#    _permission: 'import content'
+#  options:
+#    _admin_route: 'TRUE'

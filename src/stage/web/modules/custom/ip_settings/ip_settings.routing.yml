@@ -1,0 +1,7 @@
+ip_settings.settings:
+  path: '/admin/config/system/ip_settings'
+  defaults:
+    _form: '\Drupal\ip_settings\Form\IpSettingsForm'
+    _title: 'Ip Settings'
+  requirements:
+    _permission: 'administer site configuration'

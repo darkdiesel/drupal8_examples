@@ -1,0 +1,370 @@
+<?php
+
+use Drupal\ip_users\Controller\IpUserDataController;
+use Drupal\ip_webform_api\Model\IpWebformApiTasksLogModel;
+use Drupal\ip_webform_api\Model\ipWebformApiTasksModel;
+use Drupal\ip_webform_api\Controller\CalculationServiceController;
+use Drupal\ip_webform_api\Model\IpWebformSubmissionOrganisationModel;
+
+
+/**
+ * Implements hook_ENTITY_TYPE_insert()
+ *
+ * @param $webform
+ *
+ * @return bool
+ * @throws \Exception
+ */
+function ip_webform_api_webform_insert($webform) {
+  $calculationService = new CalculationServiceController();
+
+  $create_form_response = $calculationService->createWebform($webform->id());
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_update()
+ *
+ * @param $webform
+ *
+ * @return bool
+ * @throws \Exception
+ */
+function ip_webform_api_webform_update($webform) {
+  $calculationService = new CalculationServiceController();
+
+  $create_form_response = $calculationService->createWebform($webform->id());
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_insert()
+ *
+ * @param $webform_submission
+ *
+ * @return bool
+ * @throws \Exception
+ */
+function ip_webform_api_webform_submission_insert($webform_submission) {
+  $sid     = $webform_submission->id();
+  $webform = $webform_submission->getWebform();
+  $wid     = $webform->id();
+
+  if (!\Drupal::currentUser()->isAnonymous()) {
+
+    // get current user organisation to assign it to submission
+    $organisation = IpUserDataController::getOrganisation(\Drupal::currentUser());
+
+    if (!$organisation) {
+      $organisation = NULL;
+    }
+
+    IpWebformSubmissionOrganisationModel::add($wid, $sid, $organisation);
+
+    if ($webform_submission->isCompleted()) {
+      $task_model = new ipWebformApiTasksModel;
+
+      $task_log_model = new IpWebformApiTasksLogModel();
+
+      // create tasks and logs to laravel
+      $task = $task_model->add(t("Send submission; webform:@webform; submission:@submission;", [
+        '@webform'    => $wid,
+        '@submission' => $sid,
+      ]), $wid, $sid);
+
+      $task_log_model->add($task, t("Task to send submission for calculation created. Submission: @submission, form: @webform.", [
+        '@submission' => $sid,
+        '@webform'    => $wid,
+      ]));
+    }
+  }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_update()
+ *
+ * @param $webform_submission
+ *
+ * @throws \Exception
+ */
+function ip_webform_api_webform_submission_update($webform_submission) {
+  $sid     = $webform_submission->id();
+  $webform = $webform_submission->getWebform();
+  $wid     = $webform->id();
+
+  if ($webform_submission->isCompleted()) {
+    if (!\Drupal::currentUser()->isAnonymous()) {
+      $task_model     = new ipWebformApiTasksModel;
+      $task_log_model = new IpWebformApiTasksLogModel();
+
+      // create tasks and logs to laravel
+      $task = $task_model->add(t("Send submission; webform:@webform; submission:@submission;", [
+        '@webform'    => $wid,
+        '@submission' => $sid,
+      ]), $wid, $sid);
+      $task_log_model->add($task, t("Task to send submission for calculation created. Submission: @submission, form: @webform.", [
+        '@submission' => $sid,
+        '@webform'    => $wid,
+      ]));
+    }
+  }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_delete()
+ *
+ * @param $webform_submission
+ *
+ * @throws \Exception
+ */
+function ip_webform_api_webform_submission_delete(\Drupal\webform\WebformSubmissionInterface $webform_submission) {
+  $webform = $webform_submission->getWebform();
+  $wid     = $webform->id();
+  $sid     = $webform_submission->id();
+
+  $task_model     = new ipWebformApiTasksModel;
+  $task_log_model = new IpWebformApiTasksLogModel();
+
+  $task = $task_model->add(t("Delete submission; webform:@webform; submission:@submission;", [
+    '@webform'    => $wid,
+    '@submission' => $sid,
+  ]), $wid, $sid);
+
+  $task_log_model->add($task, t("Task to delete submission created. Submission: @submission, form: @webform.", [
+    '@submission' => $sid,
+    '@webform'    => $wid,
+  ]));
+
+  IpWebformSubmissionOrganisationModel::deleteByWebformSubmissionID($wid, $sid);
+  return;
+}
+
+/**
+ * Implements hook_cron()
+ */
+function ip_webform_api_cron() {
+  try {
+    // task and logger models
+    $task_model     = new ipWebformApiTasksModel;
+    $task_log_model = new IpWebformApiTasksLogModel();
+
+    // service where we will send submissions for calculation results
+    $calculationService = new CalculationServiceController();
+
+    $result = $task_model->getLastInProgressLimit();
+
+    foreach ($result as $row => $content) {
+      //@TODO: check status
+
+      if ($content->task) {
+        $task_params = explode(";", $content->task);
+
+        if (!is_array($task_params) || !count($task_params)) {
+          $task_model->setStatusError($content->task_id);
+          $task_log_model->add($content->task_id, t("Task closed with status Error for reason task params not founded."));
+          continue;
+        }
+
+        switch (strtolower(trim($task_params[0]))) {
+          case 'send submission':
+            $params = _ip_webform_api_task_parse_form_submission($task_params);
+
+            if ($params === FALSE) {
+              // Close task with error, params not parsed.
+              $task_model->setStatusError($content->task_id);
+              $task_log_model->add($content->task_id, t("Task closed with status Error for reason can't parse webform and submission."));
+
+              break;
+            }
+
+            //TODO: check if submission exist in DB
+
+            // send submission to calculation service
+            $response = $calculationService->createSubmission($params['webform'], $params['submission']);
+
+            if ($response !== FALSE) {
+              if (isset($response['success']) && $response['success']) {
+
+                if (isset($response['submission']['status'])) {
+                  $status = strtolower($response['submission']['status']);
+
+                  switch ($status) {
+                    case $task_model::STATUS_PENDING:
+                    case $task_model::STATUS_PROCESSING:
+                      // close task for sending
+                      $task_model->setStatusFinish($content->task_id);
+                      $task_log_model->add($content->task_id, t("Task closed with status Finish. Submission sent to calculation service."));
+
+                      // create task for tracking calculation submission status
+                      $task = $task_model->add(t("Track submission; webform:@webform; submission:@submission;", [
+                        '@webform'    => $params['webform'],
+                        '@submission' => $params['submission'],
+                      ]), $params['webform'], $params['submission']);
+                      $task_log_model->add($task, t("Task to track calculation submission created. Submission: @submission, form: @webform.", [
+                        '@submission' => $params['submission'],
+                        '@webform'    => $params['webform'],
+                      ]));
+                      break;
+
+                    case $task_model::STATUS_FINISHED:
+                      // close task for sending and with status nod needed to track submission status it's already processed
+                      $task_model->setStatusFinish($content->task_id);
+                      $task_log_model->add($content->task_id, t("Task closed with status Finish. Submission sent to calculation service and processed."));
+                      break;
+                    case $task_model::STATUS_ERROR:
+                      $task_model->setStatusError($content->task_id);
+
+                      if (isset($response['submission']['status_description'])) {
+                        $task_log_model->add($content->task_id, t("Some error occurred on calculation service. Error message: @error", ['@error' => $response['submission']['status_description']]));
+                      }
+
+                      $task_log_model->add($content->task_id, t("Task closed with status Error."));
+                      break;
+                    default:
+                      $task_log_model->add($content->task_id, t("Task return some new status: @status.", ['@status' => $status]));
+                      break;
+                  }
+                }
+              }
+            }
+            else {
+              $task_model->setStatusError($content->task_id);
+              $task_log_model->add($content->task_id, t("Sending submission data to calculation service executed with some error. Check Recent Log messages for details."));
+            }
+            break;
+          case 'track submission':
+            $params = _ip_webform_api_task_parse_form_submission($task_params);
+
+            if ($params === FALSE) {
+              // Close task with error, params not parsed.
+              $task_model->setStatusError($content->task_id);
+              $task_log_model->add($content->task_id, t("Task closed with status Error for reason can't parse webform and submission."));
+
+              break;
+            }
+
+            // get processing submission status from service
+            $response = $calculationService->getSubmissionDetails($params['webform'], $params['submission']);
+
+            if ($response !== FALSE) {
+              if (isset($response['submission']['status'])) {
+                $status = strtolower($response['submission']['status']);
+
+                // process task by returned status
+                switch ($status) {
+                  case $task_model::STATUS_PENDING:
+                    if ($content->status != $task_model::STATUS_PENDING) {
+                      $task_model->setStatusPending($content->task_id);
+                      $task_log_model->add($content->task_id, t("Task status changed to Pending."));
+                    }
+                    break;
+                  case $task_model::STATUS_PROCESSING:
+                    if ($content->status != $task_model::STATUS_PROCESSING) {
+                      $task_model->setStatusProcessing($content->task_id);
+                      $task_log_model->add($content->task_id, t("Task status changed to Processing."));
+                    }
+                    break;
+                  case $task_model::STATUS_ERROR:
+                    $task_model->setStatusError($content->task_id);
+
+                    if (isset($response['submission']['status_description'])) {
+                      $task_log_model->add($content->task_id, t("Some error occurred on calculation service. Error message: @error", ['@error' => $response['submission']['status_description']]));
+                    }
+
+                    $task_log_model->add($content->task_id, t("Task closed with status Error."));
+                    break;
+                  case $task_model::STATUS_FINISHED:
+                    $task_model->setStatusFinish($content->task_id);
+                    $task_log_model->add($content->task_id, t("Task closed with status Finish. Submission successfully processed."));
+                    break;
+                  default:
+                    $task_log_model->add($content->task_id, t("Task return some new status: @status.", ['@status' => $status]));
+                    break;
+                };
+              }
+            }
+            else {
+              $task_log_model->add($content->task_id, t("Getting submission details from calculation service executed with some error. Check Recent Log messages for details."));
+
+            }
+            break;
+          case 'delete submission':
+            $params = _ip_webform_api_task_parse_form_submission($task_params);
+
+            if ($params === FALSE) {
+              // Close task with error, params not parsed.
+              $task_model->setStatusError($content->task_id);
+              $task_log_model->add($content->task_id, t("Task closed with status Error for reason - can't parse webform and submission."));
+
+              break;
+            }
+
+            // get
+            $response = $calculationService->deleteSubmission($params['webform'], $params['submission']);
+
+            if ($response !== FALSE) {
+              if (isset($response['success']) && $response['success']) {
+                // close task for deleting submission
+                $task_model->setStatusFinish($content->task_id);
+                $task_log_model->add($content->task_id, t("Task closed with status Finished. Submission deleted from calculation service."));
+              }
+            }
+            else {
+              $task_model->setStatusError($content->task_id);
+              $task_log_model->add($content->task_id, t("Deleting submission from calculation service executed with some error. Check Recent Log messages for details."));
+            }
+
+            break;
+          default:
+            $task_model->setStatusFinish($content->task_id);
+            $task_log_model->add($content->task_id, t("Task closed with status Finished for reason task process function not founded."));
+            break;
+        }
+      }
+    }
+
+  } catch (\Exception $e) {
+    \Drupal::logger('ip_webform_api')
+           ->error(t('Something went wrong during processing tasks. Please contact site administrator.'));
+    \Drupal::logger('ip_webform_api')->error($e->getMessage());
+    return FALSE;
+  }
+
+}
+
+function _ip_webform_api_task_parse_form_submission($params) {
+  if ((isset($params[1]) && isset($params[2]) && (trim($params[1]) && trim($params[2])))) {
+
+    // check and get webform
+    $task_webform_params = explode(":", trim($params[1]));
+
+    if (is_array($task_webform_params) && count($task_webform_params)) {
+      if (!isset($task_webform_params[0]) || strtolower(trim($task_webform_params[0])) != 'webform') {
+        return FALSE;
+      }
+
+      if (!isset($task_webform_params[1]) || !trim($task_webform_params[1])) {
+        return FALSE;
+      }
+    }
+
+    // check and get submission
+    $task_submission_params = explode(":", trim($params[2]));
+
+    if (is_array($task_submission_params) && count($task_submission_params)) {
+      if (!isset($task_submission_params[0]) || strtolower(trim($task_submission_params[0])) != 'submission') {
+        return FALSE;
+      }
+
+      if (!isset($task_submission_params[1]) || !trim($task_submission_params[1])) {
+        return FALSE;
+      }
+    }
+
+    return [
+      'webform'    => $task_webform_params[1],
+      'submission' => $task_submission_params[1],
+    ];
+  }
+  else {
+    return FALSE;
+  }
+}

@@ -1,0 +1,106 @@
+<?php
+
+use \Drupal\ip_webform_submissions_logging\Model\IpWebFormSubmissionLogsModel;
+
+/**
+ * Implements hook_ENTITY_TYPE_insert().
+ */
+function ip_webform_submissions_logging_webform_submission_insert(\Drupal\webform\WebformSubmissionInterface $webform_submission) {
+  $webform = $webform_submission->getWebform();
+  $wid     = $webform->id();
+  $sid     = $webform_submission->id();
+
+  $log = t('New submission @submission created', ['@submission' => $sid]);
+  \Drupal\ip_webform_submissions_logging\Model\IpWebFormSubmissionLogsModel::add($log, $wid, $sid);
+
+  $return = [
+    'changed' => [],
+  ];
+
+  $original = $webform_submission->getOriginalData();
+  $data     = $webform_submission->getData();
+
+  foreach ($data as $key => $value) {
+    if (isset($original[$key]) && $original[$key] == $value) {
+      continue;
+    }
+    else {
+      $return['changed'][$key] = [
+        'from' => empty($original[$key]) ? '' : $original[$key],
+        'to'   => $value,
+      ];
+    }
+  }
+
+  if (count($return['changed'])) {
+    $log = '';
+
+    foreach ($return['changed'] as $field => $changed) {
+      $log .= t('Value of field @field set to: "@to"', [
+          '@field' => $field,
+          '@to'    => $changed['to'],
+        ])."\r\n";
+    }
+
+    IpWebFormSubmissionLogsModel::add($log, $wid, $sid);
+  }
+
+  return;
+}
+
+
+/**
+ * Implements hook_ENTITY_TYPE_update().
+ */
+function ip_webform_submissions_logging_webform_submission_update(\Drupal\webform\WebformSubmissionInterface $webform_submission) {
+  $webform = $webform_submission->getWebform();
+  $wid     = $webform->id();
+  $sid     = $webform_submission->id();
+
+  $return = ['changed' => []];
+
+  $original = $webform_submission->getOriginalData();
+  $data     = $webform_submission->getData();
+
+  foreach ($data as $key => $value) {
+    if (isset($original[$key]) && $original[$key] == $value) {
+      continue;
+    }
+    else {
+      $return['changed'][$key] = [
+        'from' => empty($original[$key]) ? '' : $original[$key],
+        'to'   => $value,
+      ];
+    }
+  }
+
+  if (count($return['changed'])) {
+    $log = '';
+
+    foreach ($return['changed'] as $field => $changed) {
+      $log .= t('Value for field @field changed from: "@from" to: "@to"', [
+        '@field' => $field,
+        '@from'  => $changed['from'],
+        '@to'    => $changed['to'],
+      ])."\r\n";
+    }
+
+    IpWebFormSubmissionLogsModel::add($log, $wid, $sid);
+  }
+
+  return;
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_delete().
+ */
+function ip_webform_submissions_logging_webform_submission_delete(\Drupal\webform\WebformSubmissionInterface $webform_submission) {
+  $webform = $webform_submission->getWebform();
+  $wid     = $webform->id();
+  $sid     = $webform_submission->id();
+
+  $log = t('Submission @submission deleted', ['@submission' => $sid]);
+  IpWebFormSubmissionLogsModel::add($log, $wid, $sid);
+
+  return;
+}

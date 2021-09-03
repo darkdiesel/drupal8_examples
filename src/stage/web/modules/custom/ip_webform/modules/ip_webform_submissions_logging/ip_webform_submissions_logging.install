@@ -1,0 +1,90 @@
+<?php
+
+/**
+ * Implements hook_install().
+ */
+function ip_webform_submissions_logging_install()
+{
+  if(db_table_exists('ip_webform_submissions_logging') == FALSE) {
+    drupal_install_schema('ip_webform_submissions_logging');
+  }
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function ip_webform_submissions_logging_uninstall()
+{
+  drupal_uninstall_schema('ip_webform_submissions_logging');
+}
+
+/**
+ * Add logs table
+ */
+function ip_webform_submissions_logging_update_8001()
+{
+  drupal_install_schema('ip_webform_submissions_logging');
+}
+
+/**
+ * Implements hook_schema().
+ */
+function ip_webform_submissions_logging_schema()
+{
+  $schema['ip_webform_submissions_logs'] = array(
+    'description' => t('Stores user activity logs according to each webform submission.'),
+    'fields' => array(
+      'lid' => array(
+        'description' => 'Primary identifier for log.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE
+      ),
+      'uid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => t('The {user}.uid of the user crating the link.')
+      ),
+      'webform' => array(
+        'description' => 'The human-readable name of this type.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''
+      ),
+      'submission' => array(
+        'description' => 'The human-readable name of this type.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => ''
+      ),
+      'log' => array(
+        'description' => 'Log text',
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'medium'
+      ),
+      'created_at' => array(
+        'description' => 'A Unix timestamp indicating when this log was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0
+      ),
+    ),
+    'foreign keys' => array(
+      'node_author' => array(
+        'table' => 'users',
+        'columns' => array(
+          'uid' => 'uid',
+        ),
+      ),
+    ),
+    'primary key' => array(
+      'lid',
+    )
+  );
+
+  return $schema;
+}

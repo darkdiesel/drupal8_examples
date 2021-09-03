@@ -1,0 +1,8 @@
+name: Ip Webform
+type: module
+description: Webform create module
+package: Ip
+core: 8.x
+
+dependencies:
+  - webform

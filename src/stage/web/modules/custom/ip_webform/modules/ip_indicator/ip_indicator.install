@@ -1,0 +1,91 @@
+<?php
+
+use Drupal\Core\Database\Database;
+
+/**
+ * Implements hook_install().
+ */
+function ip_indicator_install() {
+    if(db_table_exists('ip_indicator') == FALSE) {
+      drupal_install_schema('ip_indicator');
+    }
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function ip_indicator_uninstall() {
+    drupal_uninstall_schema('ip_indicator');
+}
+
+function ip_indicator_update_8701() {
+    $spec = [
+        'description' => t('Stores webforms indicators.'),
+        'fields' => [
+            'webform' => [
+                'description' => 'Webform identifier',
+                'type' => 'text',
+                'not null' => TRUE,
+                'size' => 'medium'
+            ],
+            'indicator' => [
+                'description' => 'Indicator',
+                'type' => 'text',
+                'not null' => TRUE,
+                'size' => 'medium'
+            ]
+        ],
+        'unique key' => [
+            'indicator'
+        ]
+    ];
+
+    $schema = Database::getConnection()->schema();
+    $schema->createTable('ip_indicator_webform', $spec);
+}
+
+/**
+ * Implements hook_schema().
+ */
+function ip_indicator_schema() {
+    $schema['ip_indicator'] = [
+        'description' => t('Stores elements indicators.'),
+        'fields' => [
+            'webform' => [
+                'description' => 'Webform identifier',
+                'type' => 'text',
+                'not null' => TRUE,
+                'size' => 'medium'
+            ],
+            'element' => [
+                'description' => 'Webform element identifier',
+                'type' => 'text',
+                'not null' => TRUE,
+                'size' => 'medium'
+            ],
+            'category' => [
+                'description' => 'Parent element category',
+                'type' => 'text',
+                'not null' => FALSE,
+                'size' => 'medium'
+            ],
+            'type' => [
+                'description' => 'Webform element type (question or category)',
+                'type' => 'int',
+                'size' => 'tiny',
+                'not null' => TRUE
+            ],
+            'indicator' => [
+                'description' => 'Indicator',
+                'type' => 'text',
+                'not null' => TRUE,
+                'size' => 'medium'
+            ]
+        ],
+        'unique key' => [
+            'indicator'
+        ],
+    ];
+
+    return $schema;
+}
